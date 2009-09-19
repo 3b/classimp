@@ -208,9 +208,9 @@
   (m-normals :pointer)
   (m-tangents :pointer)
   (m-bitangents :pointer)
-  (m-colors :pointer :count #.+ai-max-number-of-color-sets+)
-  (m-texture-coords :pointer :count #.+ai-max-number-of-texturecoords+)
-  (m-num-uv-components :unsigned-int :count #.+ai-max-number-of-texturecoords+)
+  (m-colors :pointer :count 4) ;.+ai-max-number-of-color-sets+
+  (m-texture-coords :pointer :count 4) ;+ai-max-number-of-texturecoords+
+  (m-num-uv-components :unsigned-int :count 4);+ai-max-number-of-texturecoords+
   (m-faces :pointer)
   (m-num-bones :unsigned-int)
   (m-bones :pointer)

@@ -41,6 +41,7 @@
     (values min max)))
 
 (defmethod glut:display-window :before ((window ai-sample-window))
+ (format t "display-window :before ai-sample-window...~%")
   (setf (values (bounds-min window) (bounds-max window))
         (scene-bounds (scene window)))
   (gl:polygon-mode :front :line)
@@ -92,7 +93,7 @@
          (s (/ 1.0 (max (aref d 0) (aref d 1) (aref d 2))))
          (c (sb-cga:vec/ (sb-cga:vec+ min max) 2.0)))
     (when *spin*
-      (gl:rotate (float (/ (get-internal-real-time) 10)) 0.0 1.0 0.0))
+      (gl:rotate (float (* 50 (/ (get-internal-real-time) (float internal-time-units-per-second)))) 0.0 1.0 0.0))
     (gl:scale s s s)
     (gl:translate (- (aref c 0)) (- (aref c 1)) (- (aref c 2)))))
 
@@ -139,7 +140,8 @@
                                    (merge-pathnames
                                     "cube.dae" #.(or *compile-file-pathname*
                                                      *load-pathname*)))))
-  (format t "loading ~s~%" file)
+  (format t "loading ~s (~s) ~%" file
+          (probe-file file))
   (ai:with-log-to-stdout ()
     (let ((scene
            (ai:import-into-lisp file
