@@ -1,9 +1,9 @@
 ;; port of assimp Sample_SimpleOpenGL.c to cl-opengl/cl-glut
 ;;
-(cl:defpackage #:classimp-sample
-  (:use #:cl))
-
-(in-package #:classimp-sample)
+(defpackage #:simple-sample
+  (:use :cl)
+  (:export #:ai-sample))
+(in-package #:simple-sample)
 
 (defclass ai-sample-window (glut:window)
   ((file :accessor file :initarg :file)
@@ -14,12 +14,6 @@
 
   (:default-initargs :width 640 :height 480 :title "..."
                      :mode '(:double :rgb :depth :multisample)))
-
-(defmacro restartable (&body body)
-  "helper macro for adding continue restarts"
-  `(restart-case
-      (progn ,@body)
-    (continue () :report "Continue"  )))
 
 (defun scene-bounds (scene)
   (let ((min (sb-cga:vec 1f10 1f10 1f10))
@@ -104,8 +98,7 @@
              (scene w))
     (let ((*tris* 0))
 
-      (restartable
-        (xform w))
+      (xform w)
       (recursive-render (scene w) (ai:root-node (scene w)))
       (when *dump*
        (setf *dump* nil)
@@ -136,17 +129,17 @@
   (when (eql key #\d)
     (setf *dump* t)))
 
-(defun ai-sample (&optional (file (namestring
-                                   (merge-pathnames
-                                    "cube.dae" #.(or *compile-file-pathname*
-                                                     *load-pathname*)))))
+(defun ai-sample (&optional (file (merge-pathnames
+                                   "cube.dae" #.(or *compile-file-pathname*
+                                                    *load-pathname*))))
   (format t "loading ~s (~s) ~%" file
           (probe-file file))
   (ai:with-log-to-stdout ()
     (let ((scene
-           (ai:import-into-lisp file
+           (ai:import-into-lisp (cffi-sys:native-namestring (truename file))
                                 :ai-process-preset-target-realtime-quality)))
       (when scene (glut:display-window (make-instance 'ai-sample-window
                                                       :scene scene))))))
 
 ;(ai-sample)
+;(cl-glut:main-loop)
