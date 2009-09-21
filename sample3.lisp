@@ -147,7 +147,18 @@
       (if tex-name
           (progn
             (gl:enable :texture-2d)
-            (gl:bind-texture :texture-2d tex-name))
+            (gl:bind-texture :texture-2d tex-name)
+            (let ((uvx (car (gethash "$tex.uvtrafo" material))))
+              (gl:matrix-mode :texture)
+              (gl:load-identity)
+              (when uvx
+                  (destructuring-bind (type index (x s r)) uvx
+                    (declare (ignore type index))
+                    (gl:translate (aref x 0) (aref x 1) 0.0)
+                    (gl:scale (aref s 0) (aref s 1) 1.0)
+                    (gl:rotate (* (/ 180 pi) r) 0.0 0.0 1.0)
+                    ))
+              (gl:matrix-mode :modelview)))
           (gl:disable :texture-2d)))))
 
 (defmethod recursive-render ((w ai-sample3-window))

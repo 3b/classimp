@@ -231,6 +231,12 @@
 
 ;; possibly should just combine these into a generic 'struct/array with
 ;; N-floats -> array' function?
+(defun translate-ai-vector2 (v)
+  (when (not (cffi:null-pointer-p v))
+    ;;(format t "translating vector3d ~s~%" v)
+    (make-array 2 :element-type 'single-float
+                :initial-contents (loop for i below 2
+                                     collect (cffi:mem-aref v :float i)))))
 (defun translate-ai-vector3d (v)
   (when (not (cffi:null-pointer-p v))
     ;;(format t "translating vector3d ~s~%" v)
@@ -433,8 +439,8 @@
        'channels channels
        'index index))))
 
-(defun translate-ai-material-property (p)
-  (cffi:with-foreign-slots ((%ai:m-key
+(defun translate-generic-material-property (key p)
+  (cffi:with-foreign-slots ((
                              %ai:m-semantic
                              %ai:m-index
                              %ai:m-data-length
@@ -456,14 +462,66 @@
                     (:ai-pti-string (translate-ai-string %ai:m-data))
                     (:ai-pti-buffer (data-array '(unsigned-byte 8) :unsigned-char)))))
         (if (eq %ai:m-semantic :ai-texture-type-none)
-            (format t "material property: ~s = ~s~%"
-                    (translate-ai-string %ai:m-key) data)
+            (format t "material property: ~s = ~s~%" key data)
             (format t "material property: ~s / ~s, ~s == ~s~%"
-                    (translate-ai-string %ai:m-key)
+                    key
                     %ai:m-semantic %ai:m-index
                     data))
-        (list
-         (translate-ai-string %ai:m-key) %ai:m-semantic %ai:m-index data)))))
+        (list key %ai:m-semantic %ai:m-index data)))))
+
+(defun translate-ai-uv-transform (x)
+  (cffi:with-foreign-slots ((%ai:m-translation %ai:m-scaling %ai:m-rotation)
+                            x %ai:ai-uv-transform)
+    ;; rotation is radians, ccw around 0.5,0.5 in UV space, default 0
+    (list (translate-ai-vector2 %ai:m-translation)
+          (translate-ai-vector2 %ai:m-scaling)
+          %ai:m-rotation)))
+
+(defun translate-ai-material-property (p)
+  (cffi:with-foreign-slots ((%ai:m-key
+                             %ai:m-semantic
+                             %ai:m-index
+                             %ai:m-data-length
+                             %ai:m-type
+                             %ai:m-data)
+                            p %ai:ai-material-property)
+    (let ((key (translate-ai-string %ai:m-key)))
+      (labels ((k= (s) (string= key s))
+               (single-value (type)
+                 (assert (= %ai:m-data-length 4))
+                 (cffi:mem-aref %ai:m-data type))
+               (keyword (name type)
+                 (when (k= name)
+                   (format t "~s = ~s~%" name (single-value type))
+                   (list key %ai:m-semantic %ai:m-index (single-value type))))
+               (flag (name)
+                 (when (k= name)
+                   (format t "~s = ~s = ~s~%" key (single-value :uint)
+                           (not (zerop (single-value :uint))))
+                   (list key %ai:m-semantic %ai:m-index
+                         (not (zerop (single-value :uint)))))))
+        (cond
+          ((keyword "$mat.shadingm" '%ai:ai-shading-mode))
+          ((keyword "$mat.blend" '%ai:ai-blend-mode))
+          ((flag "$mat.twosided"))
+          ((flag "$mat.wireframe"))
+          ((keyword "$tex.op" '%ai:ai-texture-op))
+          ((keyword "$tex.mapmodeu" '%ai:ai-texture-map-mode))
+          ((keyword "$tex.mapmodev" '%ai:ai-texture-map-mode))
+          ((keyword "$tex.mapping" '%ai:ai-texture-mapping))
+          ((keyword "$tex.flags" '%ai:ai-texture-flags))
+          ((keyword "$tex.blend" :float))
+          ((k= "$tex.uvtrafo")
+           (assert (= %ai:m-data-length
+                      (cffi:foreign-type-size %ai:ai-uv-transform)))
+           (let ((x (translate-ai-uv-transform %ai:m-data)))
+             (format t "~s = ~s~%" key x)
+             (list key %ai:m-semantic %ai:m-index x)))
+          ((keyword "$tex.blend" '%ai:ai-blend-mode))
+          ((keyword "$tex.blend" '%ai:ai-blend-mode))
+          ;;; "$tex.file" "$tex.uvwsrc" "$tex.mapaxis"
+
+          (t (translate-generic-material-property key p)))))))
 
 (defun translate-ai-material (m)
   (cffi:with-foreign-slots ((%ai:m-num-properties %ai:m-properties)

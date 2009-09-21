@@ -452,30 +452,27 @@
   (close-proc ai-file-close-proc)
   (user-data ai-user-data))
 
-(cffi:defcenum ai-texture-mapping
+(cffi:defcenum (ai-texture-mapping :int)
   (:ai-texture-mapping-uv 0)
   (:ai-texture-mapping-sphere 1)
   (:ai-texture-mapping-cylinder 2)
   (:ai-texture-mapping-box 3)
   (:ai-texture-mapping-plane 4)
-  (:ai-texture-mapping-other 5)
-  (:_ai-texture-mapping-force-32-bit -1610612737))
+  (:ai-texture-mapping-other 5))
 
-(cffi:defcenum ai-texture-op
+(cffi:defcenum (ai-texture-op :int)
   (:ai-texture-op-multiply 0)
   (:ai-texture-op-add 1)
   (:ai-texture-op-subtract 2)
   (:ai-texture-op-divide 3)
   (:ai-texture-op-smooth-add 4)
-  (:ai-texture-op-signed-add 5)
-  (:_ai-texture-op-force-32-bit -1610612737))
+  (:ai-texture-op-signed-add 5))
 
-(cffi:defcenum ai-texture-map-mode
+(cffi:defcenum (ai-texture-map-mode :int)
   (:ai-texture-map-mode-wrap 0)
   (:ai-texture-map-mode-clamp 1)
   (:ai-texture-map-mode-decal 3)
-  (:ai-texture-map-mode-mirror 2)
-  (:_ai-texture-map-mode-force-32-bit -1610612737))
+  (:ai-texture-map-mode-mirror 2))
 
 (cffi:defcfun ("aiGetMaterialTexture" ai-get-material-texture) ai-return
   (mat :pointer)
@@ -511,11 +508,10 @@
               (rotation :pointer)
               (position :pointer))
 
-(cffi:defcenum ai-texture-flags
+(cffi:defbitfield (ai-texture-flags :int)
   (:ai-texture-flags-invert 1)
   (:ai-texture-flags-use-alpha 2)
-  (:ai-texture-flags-ignore-alpha 4)
-  (:_ai-texture-flags-force-32-bit -1610612737))
+  (:ai-texture-flags-ignore-alpha 4))
 
 (cffi:defcfun ("aiGetExtensionList" ai-get-extension-list) :void
   (sz-out :pointer))
@@ -585,10 +581,9 @@
   (index :unsigned-int)
   (p-out :pointer))
 
-(cffi:defcenum ai-blend-mode
+(cffi:defcenum (ai-blend-mode :int)
   (:ai-blend-mode-default 0)
-  (:ai-blend-mode-additive 1)
-  (:_ai-blend-mode-force-32-bit -1610612737))
+  (:ai-blend-mode-additive 1))
 
 (cffi:defcfun ("aiSetImportPropertyInteger" ai-set-import-property-integer) :void
   (sz-name :pointer)
