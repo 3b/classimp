@@ -163,8 +163,8 @@
       ""))
 
 (defun translate-ai-string (str)
-  (cffi:with-foreign-slots ((%ai:length %ai:data) str '%ai:ai-string)
-    (decode-string '%ai:data '%ai:length)))
+  (cffi:with-foreign-slots ((%ai:length %ai:data) str %ai:ai-string)
+    (decode-string %ai:data %ai:length)))
 
 (defun translate-ai-matrix-4x4 (m)
   (when (not (cffi:null-pointer-p m))
@@ -512,8 +512,13 @@
           ((keyword "$tex.flags" '%ai:ai-texture-flags))
           ((keyword "$tex.blend" :float))
           ((k= "$tex.uvtrafo")
-           (assert (= %ai:m-data-length
-                      (cffi:foreign-type-size %ai:ai-uv-transform)))
+           ;; some files have extra bytes here, not sure if there is
+           ;; anything useful there or not...
+           (assert (>= %ai:m-data-length
+                       (cffi:foreign-type-size '%ai:ai-uv-transform))
+                   () "uv-trafo data length =~s expected ~s"
+                   %ai:m-data-length
+                   (cffi:foreign-type-size '%ai:ai-uv-transform))
            (let ((x (translate-ai-uv-transform %ai:m-data)))
              (format t "~s = ~s~%" key x)
              (list key %ai:m-semantic %ai:m-index x)))
