@@ -152,19 +152,19 @@
 
 ;;todo: with-imported-scene ?
 
-(defun translate-ai-string (str)
+(defun decode-string (pointer length)
   ;; fixme: what is correct way to do this in cffi?
-  (if (plusp (cffi:foreign-slot-value str '%ai:ai-string '%ai:length))
+  (if (plusp length)
       (or (ignore-errors
-            (cffi:foreign-string-to-lisp
-             (cffi:foreign-slot-value str '%ai:ai-string '%ai:data)
-             :encoding :utf-8
-             :max-chars (cffi:foreign-slot-value str '%ai:ai-string '%ai:length)))
-          (cffi:foreign-string-to-lisp
-           (cffi:foreign-slot-value str '%ai:ai-string '%ai:data)
-           :encoding :latin1
-           :max-chars (cffi:foreign-slot-value str '%ai:ai-string '%ai:length)))
+            (cffi:foreign-string-to-lisp pointer :encoding :utf-8
+                                         :count length))
+          (cffi:foreign-string-to-lisp pointer :encoding :latin1
+                                       :count length))
       ""))
+
+(defun translate-ai-string (str)
+  (cffi:with-foreign-slots ((%ai:length %ai:data) str '%ai:ai-string)
+    (decode-string '%ai:data '%ai:length)))
 
 (defun translate-ai-matrix-4x4 (m)
   (when (not (cffi:null-pointer-p m))
@@ -432,18 +432,60 @@
        'ticks-per-second %ai:m-ticks-per-second
        'channels channels
        'index index))))
-#++(defun translate-mesh-array (a count)
-     (make-array count
-              :initial-contents
-              (loop for i below count
-                 collect (translate-ai-mesh (cffi:mem-aref a :pointer i)))))
-;; not done yet...
-(defun translate-material-array (a count)
-  
-)
-#++(defun translate-animation-array (a count)
-  (error "old function")
-)
+
+(defun translate-ai-material-property (p)
+  (cffi:with-foreign-slots ((%ai:m-key
+                             %ai:m-semantic
+                             %ai:m-index
+                             %ai:m-data-length
+                             %ai:m-type
+                             %ai:m-data)
+                            p %ai:ai-material-property)
+    (flet ((data-array (lisp-type cffi-type)
+             (if (= %ai:m-data-length 4)
+                 (cffi:mem-aref %ai:m-data cffi-type)
+                 (make-array (/ %ai:m-data-length 4)
+                             :element-type lisp-type
+                             :initial-contents
+                             (loop for i below (/ %ai:m-data-length 4)
+                                collect (cffi:mem-aref %ai:m-data
+                                                       cffi-type i))))))
+      (let ((data (ecase %ai:m-type
+                    (:ai-pti-float (data-array 'single-float :float))
+                    (:ai-pti-integer (data-array '(signed-byte 32) :int))
+                    (:ai-pti-string (translate-ai-string %ai:m-data))
+                    (:ai-pti-buffer (data-array '(unsigned-byte 8) :unsigned-char)))))
+        (if (eq %ai:m-semantic :ai-texture-type-none)
+            (format t "material property: ~s = ~s~%"
+                    (translate-ai-string %ai:m-key) data)
+            (format t "material property: ~s / ~s, ~s == ~s~%"
+                    (translate-ai-string %ai:m-key)
+                    %ai:m-semantic %ai:m-index
+                    data))
+        (list
+         (translate-ai-string %ai:m-key) %ai:m-semantic %ai:m-index data)))))
+
+(defun translate-ai-material (m)
+  (cffi:with-foreign-slots ((%ai:m-num-properties %ai:m-properties)
+                            m %ai:ai-material)
+    (format t "loading material, ~s properties~%" %ai:m-num-properties)
+    ;; keys are theoretically case insensitive, not sure if they ever
+    ;; vary though, since there is a limited set or predefined values
+    (loop with hash = (make-hash-table :test 'equalp)
+       for i below %ai:m-num-properties
+       for (key semantic index value) = (translate-ai-material-property
+                                         (cffi:mem-aref %ai:m-properties
+                                                        :pointer i))
+       do (if (eq semantic :ai-texture-type-none)
+              (progn
+                (when (gethash key hash)
+                  (format t "duplicate key ~s in material? ~s / ~s~%"
+                          key (gethash key hash) value))
+                (setf (gethash key hash) value))
+              (push (list semantic index value) (gethash key hash nil)))
+       finally (progn (format t " == ~s~%" (alexandria:hash-table-plist hash))
+                      (return hash)))))
+
 (defun translate-texture-array (a count))
 (defun translate-light-array (a count))
 (defun translate-camera-array (a count))
@@ -464,7 +506,8 @@
      'root (translate-ai-node %ai:m-root-node)
      'meshes (translate-ai-array translate-ai-mesh
                                  %ai:m-num-meshes %ai:m-meshes)
-     'materials (translate-material-array %ai:m-materials %ai:m-num-materials)
+     'materials (print (translate-ai-array translate-ai-material
+                                     %ai:m-num-materials %ai:m-materials))
      'animations (translate-ai-array translate-ai-animation
                                      %ai:m-num-animations %ai:m-animations)
      'textures (translate-texture-array %ai:m-textures %ai:m-num-textures)
@@ -483,17 +526,23 @@
 
 (defun import-into-lisp (filename &rest processing-flags)
   (let ((raw-scene nil))
-    (unwind-protect
-         (progn
-           (setf raw-scene
-                 (without-fp-traps
-                   (%ai:ai-import-file
-                    filename
-                    (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
-                                                 processing-flags))))
-           (unless (cffi:null-pointer-p raw-scene)
-             (translate-ai-scene raw-scene)))
-      (when raw-scene (%ai:ai-release-import raw-scene)))))
+    (prog1
+        (unwind-protect
+          (progn
+            (format t "  ai-import-file ~s~%" filename)
+            (setf raw-scene
+                  (without-fp-traps
+                    (%ai:ai-import-file
+                     filename
+                     (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
+                                                  processing-flags))))
+            (unless (cffi:null-pointer-p raw-scene)
+              (format t "  translate-scene~%")
+              (translate-ai-scene raw-scene)))
+       (when raw-scene
+         (format t "  ai-release-import ~s~%" filename)
+         (%ai:ai-release-import raw-scene)))
+      (format t "import-into-lisp ~s done~%" filename))))
 
 
 ;; todo: function to filter unused nodes as suggested in

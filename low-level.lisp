@@ -32,12 +32,11 @@
   (g :float)
   (b :float))
 
-(cffi:defcenum ai-property-type-info
+(cffi:defcenum (ai-property-type-info :int)
   (:ai-pti-float 1)
   (:ai-pti-string 3)
   (:ai-pti-integer 4)
-  (:ai-pti-buffer 5)
-  (:_ai-pti-force-32-bit -1610612737))
+  (:ai-pti-buffer 5))
 
 (cffi::defctype ai-bool :int)
 
@@ -108,9 +107,26 @@
   (quat :pointer)
   (mat :pointer))
 
+(cffi:defcenum (ai-texture-type :int)
+  (:ai-texture-type-none 0)
+  (:ai-texture-type-diffuse 1)
+  (:ai-texture-type-specular 2)
+  (:ai-texture-type-ambient 3)
+  (:ai-texture-type-emissive 4)
+  (:ai-texture-type-height 5)
+  (:ai-texture-type-normals 6)
+  (:ai-texture-type-shininess 7)
+  (:ai-texture-type-opacity 8)
+  (:ai-texture-type-displacement 9)
+  (:ai-texture-type-lightmap 10)
+  (:ai-texture-type-reflection 11)
+  (:ai-texture-type-unknown 12))
+
+
+
 (cffi:defcstruct ai-material-property
   (m-key ai-string)
-  (m-semantic :unsigned-int)
+  (m-semantic ai-texture-type)
   (m-index :unsigned-int)
   (m-data-length :unsigned-int)
   (m-type ai-property-type-info)
@@ -124,22 +140,6 @@
   (m-properties :pointer)
   (m-num-properties :unsigned-int)
   (m-num-allocated :unsigned-int))
-
-(cffi:defcenum ai-texture-type
-  (:ai-texture-type-none 0)
-  (:ai-texture-type-diffuse 1)
-  (:ai-texture-type-specular 2)
-  (:ai-texture-type-ambient 3)
-  (:ai-texture-type-emissive 4)
-  (:ai-texture-type-height 5)
-  (:ai-texture-type-normals 6)
-  (:ai-texture-type-shininess 7)
-  (:ai-texture-type-opacity 8)
-  (:ai-texture-type-displacement 9)
-  (:ai-texture-type-lightmap 10)
-  (:ai-texture-type-reflection 11)
-  (:ai-texture-type-unknown 12)
-  (:_ai-texture-type-force-32-bit -1610612737))
 
 (cffi:defcfun ("aiGetMaterialProperty" ai-get-material-property) ai-return
   (p-mat :pointer)
