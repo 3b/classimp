@@ -136,10 +136,15 @@
                    (gl:color (aref value 0) (aref value 1) (aref value 2) (aref value 3)))))))
     (material :ambient (gethash "$clr.ambient" material))
     (material :diffuse (gethash "$clr.diffuse" material))
-    (material :specular(gethash "$clr.specular" material))
+    (material :specular (gethash "$clr.specular" material))
     (material :emission (gethash "$clr.emissive" material))
     (material :shininess (gethash "$mat.shininess" material))
     (material :emission (gethash "$clr.emissive" material))
+    ;; for gourad shading or 0.0 shininess, turn off specular
+    (when (or (eq :ai-shading-mode-gouraud (gethash "$mat.shadingm" material))
+              (not (gethash "$mat.shininess" material))
+              (zerop (gethash "$mat.shininess" material)))
+      (gl:material :front :specular (vector 0.0 0.0 0.0 1.0)))
     (let* ((tex (gethash "$tex.file" material))
            (tex-name (getf (cdddr (assoc :ai-texture-type-diffuse tex))
                            :texture-name)))
@@ -152,12 +157,14 @@
               (gl:matrix-mode :texture)
               (gl:load-identity)
               (when uvx
-                  (destructuring-bind (type index (x s r)) uvx
-                    (declare (ignore type index))
-                    (gl:translate (aref x 0) (aref x 1) 0.0)
-                    (gl:scale (aref s 0) (aref s 1) 1.0)
-                    (gl:rotate (* (/ 180 pi) r) 0.0 0.0 1.0)
-                    ))
+                ;; not sure about order of these...
+                (destructuring-bind (type index (x s r)) uvx
+                  (declare (ignore type index))
+                  (gl:translate (aref x 0) (aref x 1) 0.0)
+                  (gl:scale (aref s 0) (aref s 1) 1.0)
+                  (gl:translate 0.5 0.5 0.0)
+                  (gl:rotate (- (* (/ 180 pi) r)) 0.0 0.0 1.0)
+                  (gl:translate -0.5 -0.5 0.0)))
               (gl:matrix-mode :modelview)))
           (gl:disable :texture-2d)))))
 
@@ -176,78 +183,95 @@
                (gl:mult-matrix (gethash (ai:name node) *bone-transforms*))
                (gl:color 1.5 0.4 0.0 1.0)
                (axes (* (scene-scale w) 0.1))))
-           (loop
-              with node-meshes = (ai:meshes node)
-              with scene-meshes = (ai:meshes scene)
-              for mesh-index across node-meshes
-              for mesh = (aref scene-meshes mesh-index)
-              for faces = (ai:faces mesh)
-              for vertices = (ai:vertices mesh)
-              for bones = (ai:bones mesh)
-              when bones
-              do (loop
-                    with skinned-vertices = (map-into
-                                             (make-array (length vertices))
-                                             (lambda ()
-                                               (sb-cga:vec 0.0 0.0 0.0)))
-                    for bone across bones
-                    for ofs = (ai:offset-matrix bone)
-                    for bx = (gethash (ai:name bone) *bone-transforms*)
-                    for nx = (gethash (ai:name bone) *node-transforms*)
-                    for mm = (if (and ofs bx )
-                                 (sb-cga:matrix* bx (sb-cga:transpose-matrix ofs))
-                                 (or ofs bx))
-                    do (when mm
-                         (loop for w across (ai:weights bone)
-                            for id = (ai:id w)
-                            for weight = (ai:weight w)
-                            do
-                            (setf (aref skinned-vertices id)
-                                  (sb-cga:vec+ (aref skinned-vertices id)
-                                               (sb-cga:vec*
-                                                (sb-cga:transform-point
-                                                 (aref vertices id)
-                                                 mm)
-                                                weight)))))
-                    finally (setf vertices skinned-vertices))
-              do
-                (gl:material :front :ambient #(0.2 0.2 0.2 1.0))
-                (gl:material :front :diffuse #(0.8 0.8 0.8 1.0))
-                (gl:material :front :emission #(0.0 0.0 0.0 1.0))
-                (gl:material :front :specular #(1.0 0.0 0.0 1.0))
-                (gl:material :front :shininess 120.0)
-                (gl:color 1.0 1.0 1.0 1.0)
-                (if (ai:material-index mesh)
-                  (set-up-material w (aref (ai:materials scene)
-                                           (ai:material-index mesh))))
-                (gl:with-primitives :triangles
-                  (loop
-                      for face across faces
-                      do
-                      (incf *tris*)
-                      (loop
-                         for i across face
-                         for v = (aref vertices i)
-                         do
-                           (when (ai:normals mesh)
-                             (let ((n (sb-cga:normalize (aref (ai:normals mesh)
-                                                              i))))
-                             (gl:normal (aref n 0) (aref n 1) (aref n 2))))
-                           (when (and (ai:colors mesh)
-                                      (> (length (ai:colors mesh)) 0))
-                             (let ((c (aref (ai:colors mesh) 0)))
-                               (when (setf c (aref c i)))
-                               (when c (gl:color (aref c 0)
-                                                 (aref c 1)
-                                                 (aref c 2)))))
-                           (when (and (ai:texture-coords mesh)
-                                      (> (length (ai:texture-coords mesh)) 0))
-                             (let ((tc (aref (ai:texture-coords mesh) 0)))
-                               (when tc
-                                 (gl:tex-coord (aref (aref tc i) 0)
-                                               (aref (aref tc i) 1)
-                                               (aref (aref tc i) 2)))))
-                         (gl:vertex (aref v 0) (aref v 1) (aref v 2))))))
+           (gl:with-pushed-matrix
+             (gl:mult-matrix (sb-cga:transpose-matrix
+                              (gethash (ai:name node) *node-transforms*)))
+
+            (loop
+               with node-meshes = (ai:meshes node)
+               with scene-meshes = (ai:meshes scene)
+               for mesh-index across node-meshes
+               for mesh = (aref scene-meshes mesh-index)
+               for faces = (ai:faces mesh)
+               for vertices = (ai:vertices mesh)
+               for bones = (ai:bones mesh)
+               when bones
+               do (loop
+                     with skinned-vertices = (map-into
+                                              (make-array (length vertices))
+                                              (lambda ()
+                                                (sb-cga:vec 0.0 0.0 0.0)))
+                     for bone across bones
+                     for ofs = (ai:offset-matrix bone)
+                     for bx = (gethash (ai:name bone) *bone-transforms*)
+                     for bnx = (gethash (ai:name bone) *node-transforms*)
+                     for nx = (gethash (ai:name node) *node-transforms*)
+                     for mm = (if (and ofs bx)
+                                  (sb-cga:matrix*
+                                   (sb-cga:transpose-matrix (sb-cga:inverse-matrix nx))
+                                   bx (sb-cga:transpose-matrix ofs)
+                                   ;(sb-cga:inverse-matrix (sb-cga:transpose-matrix nx))
+
+)
+                                  (or ofs bx))
+                     do (when mm
+                          (loop for w across (ai:weights bone)
+                             for id = (ai:id w)
+                             for weight = (ai:weight w)
+                             do
+                             (setf (aref skinned-vertices id)
+                                   (sb-cga:vec+ (aref skinned-vertices id)
+                                                (sb-cga:vec*
+                                                 (sb-cga:transform-point
+                                                  (aref vertices id)
+                                                  mm)
+                                                 weight)))))
+                     finally (setf vertices skinned-vertices))
+               do
+               (gl:material :front :ambient #(0.2 0.2 0.2 1.0))
+               (gl:material :front :diffuse #(0.8 0.8 0.8 1.0))
+               (gl:material :front :emission #(0.0 0.0 0.0 1.0))
+               (gl:material :front :specular #(1.0 0.0 0.0 1.0))
+               (gl:material :front :shininess 15.0)
+               (gl:color 1.0 1.0 1.0 1.0)
+               (if (ai:material-index mesh)
+                   (set-up-material w (aref (ai:materials scene)
+                                            (ai:material-index mesh))))
+               (gl:with-primitives (cond
+                                     ((ai:mesh-has-multiple-primitive-types mesh)
+                                      (when *dump* (format t "multiple primitive types in mesh?"))
+                                      :points)
+                                     ((ai:mesh-has-points mesh) :points)
+                                     ((ai:mesh-has-lines mesh) :lines)
+                                     ((ai:mesh-has-triangles mesh) :triangles)
+                                     ((ai:mesh-has-polygons mesh) :polygons))
+                 (loop
+                    for face across faces
+                    do
+                    (incf *tris*)
+                    (loop
+                       for i across face
+                       for v = (aref vertices i)
+                       do
+                       (when (ai:normals mesh)
+                         (let ((n (sb-cga:normalize (aref (ai:normals mesh)
+                                                          i))))
+                           (gl:normal (aref n 0) (aref n 1) (aref n 2))))
+                       (when (and (ai:colors mesh)
+                                  (> (length (ai:colors mesh)) 0))
+                         (let ((c (aref (ai:colors mesh) 0)))
+                           (when (setf c (aref c i)))
+                           (when c (gl:color (aref c 0)
+                                             (aref c 1)
+                                             (aref c 2)))))
+                       (when (and (ai:texture-coords mesh)
+                                  (> (length (ai:texture-coords mesh)) 0))
+                         (let ((tc (aref (ai:texture-coords mesh) 0)))
+                           (when tc
+                             (gl:tex-coord (aref (aref tc i) 0)
+                                           (aref (aref tc i) 1)
+                                           (aref (aref tc i) 2)))))
+                       (gl:vertex (aref v 0) (aref v 1) (aref v 2)))))))
            (loop for child across (ai:children node)
               do (r scene child)))))
     (r (scene w) (ai:root-node (scene w)))))
@@ -299,7 +323,8 @@
         (glut:height window) height)
   (gl:matrix-mode :projection)
   (gl:load-identity)
-  (gl:ortho -1 1 -1 1 -10 10)
+  (let ((aspect (float (/ height width) 1.0)))
+    (gl:ortho -1 1 (- aspect) aspect -10 10))
   (gl:viewport 0 0 width height)
   (gl:matrix-mode :modelview))
 

@@ -51,9 +51,9 @@
                   do (setf min (sb-cga:vec-min min transformed)
                            max (sb-cga:vec-max max transformed))))
             (node-bounds (node xform)
-              (let ((transform (sb-cga:matrix* (ai:transform node) xform)))
+              (let ((transform (sb-cga:matrix* xform (ai:transform node))))
                 (loop for i across (ai:meshes node)
-                   do (mesh-bounds (aref (ai:meshes scene) i) xform))
+                   do (mesh-bounds (aref (ai:meshes scene) i) transform))
                 (loop for i across (ai:children node)
                    do (node-bounds i transform)))))
       (node-bounds (ai:root-node scene) (sb-cga:identity-matrix)))
@@ -128,6 +128,7 @@
     (format t "reload scene -> ~s~%" *filename*)
     (let ((s (ai:import-into-lisp
               (cffi-sys:native-namestring (truename *filename*))
+              :ai-process-validate-data-structure
               :ai-process-preset-target-realtime-quality)))
       (when (and window s)
         (unload-textures window)

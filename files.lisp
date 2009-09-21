@@ -6,7 +6,7 @@
 ;; fixme: figure out actual supported extension list...
 (defparameter *extensions*
   '("x" "X" "WRL" "ter" "max" "STL" "smd" "raw" "q3s" "q3o" "ply"
-    "off" "mtl" "obj" "mat" "nff" "rtf" "mdl"
+    "off" "mtl" "obj" "mat" "nff" "mdl"
     "md5mesh"
     "md3" "md2"
     "lxo" "lwo" "irrmesh" "irr" "hmp" "dxf"
@@ -16,7 +16,7 @@
     "3d" "uc"))
 
 (defparameter *ignore-files* '("tga" "svn-base"  "jpg" "txt"  "png" "bmp"
-                               "blend" "shader"  "lws"
+                               "blend" "shader"  "lws" "rtf"
                                "md5anim""material" nil))
 
 (defun find-files (path)
