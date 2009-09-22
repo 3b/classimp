@@ -51,7 +51,7 @@
                   do (setf min (sb-cga:vec-min min transformed)
                            max (sb-cga:vec-max max transformed))))
             (node-bounds (node xform)
-              (let ((transform (sb-cga:matrix* xform (ai:transform node))))
+              (let ((transform (sb-cga:matrix* (ai:transform node) xform)))
                 (loop for i across (ai:meshes node)
                    do (mesh-bounds (aref (ai:meshes scene) i) transform))
                 (loop for i across (ai:children node)
@@ -93,7 +93,42 @@
      for tex.file = (gethash "$tex.file" i)
      do (loop for tf in tex.file
            for (semantic index file) = tf
-           unless (find #\* file)
+           if (and (plusp (length file))
+                   (char= #\* (char file 0))) ;; embedded file
+           do (let ((tex-index (parse-integer (subseq file 1) :junk-allowed t)))
+                (if (or (not tex-index) (not (numberp tex-index))
+                        (minusp tex-index)
+                        (>= tex-index (length (ai:textures (scene window)))))
+                    (format t "bad embedded texture index ~s (~s)~%"
+                            tex-index (subseq file 1))
+                    (destructuring-bind (type w h data &optional format-hint)
+                        (aref (ai:textures (scene window)) tex-index )
+                      (declare (ignorable format-hint))
+                      (if (eq type :bgra)
+                          (let ((name (car (gl:gen-textures 1))))
+                            (format t "load embedded texture ~s x ~s~%" w h)
+                            (gl:bind-texture :texture-2d name)
+                            (gl:tex-parameter :texture-2d :texture-min-filter
+                                              :linear)
+                            (gl:tex-parameter :texture-2d :generate-mipmap t)
+                            (gl:tex-parameter :texture-2d :texture-min-filter
+                                              :linear-mipmap-linear)
+                            (gl:tex-image-2d :texture-2d 0 :rgba w h
+                                             0 :bgra :unsigned-byte
+                                             data)
+                            (setf (getf (cdddr tf) :texture-name) name))
+                          (let ((iname (il:gen-image))
+                                (result nil))
+                            (il:with-bound-image iname
+                              (cffi:with-pointer-to-vector-data (p data)
+                                (il:load-l :unknown p (length data) ))
+                              (setf result (ilut:gl-bind-tex-image)))
+                            (il:delete-images (list iname))
+                            (setf (getf (cdddr tf) :texture-name) result))))
+))
+           else if (find #\* file) ;; texture name with * in it?
+           do (format t "bad texture name ~s~%" file)
+           else ;; external texture
            do (let* ((cleaned (substitute
                                #\/ #\\
                                (string-trim #(#\space #\Newline

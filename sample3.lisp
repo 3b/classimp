@@ -195,6 +195,7 @@
                for faces = (ai:faces mesh)
                for vertices = (ai:vertices mesh)
                for bones = (ai:bones mesh)
+               for normals = (ai:normals mesh)
                when bones
                do (loop
                      with skinned-vertices = (map-into
@@ -237,14 +238,17 @@
                (if (ai:material-index mesh)
                    (set-up-material w (aref (ai:materials scene)
                                             (ai:material-index mesh))))
-               (gl:with-primitives (cond
-                                     ((ai:mesh-has-multiple-primitive-types mesh)
-                                      (when *dump* (format t "multiple primitive types in mesh?"))
-                                      :points)
-                                     ((ai:mesh-has-points mesh) :points)
-                                     ((ai:mesh-has-lines mesh) :lines)
-                                     ((ai:mesh-has-triangles mesh) :triangles)
-                                     ((ai:mesh-has-polygons mesh) :polygons))
+                 (gl:with-primitives
+                     (cond
+                       ((ai:mesh-has-multiple-primitive-types mesh)
+                        (when *dump*
+                          (format t "multiple primitive types in mesh?"))
+                        (setf normals nil)
+                        :points)
+                       ((ai:mesh-has-points mesh) (setf normals nil) :points)
+                       ((ai:mesh-has-lines mesh) (setf normals nil) :lines)
+                       ((ai:mesh-has-triangles mesh) :triangles)
+                       ((ai:mesh-has-polygons mesh) :polygons))
                  (loop
                     for face across faces
                     do
@@ -253,7 +257,7 @@
                        for i across face
                        for v = (aref vertices i)
                        do
-                       (when (ai:normals mesh)
+                       (when normals
                          (let ((n (sb-cga:normalize (aref (ai:normals mesh)
                                                           i))))
                            (gl:normal (aref n 0) (aref n 1) (aref n 2))))
@@ -296,7 +300,7 @@
           (gl:rotate (float *spin* 1.0) 0.0 1.0 0.0)
           (gl:rotate (spin) 0.0 1.0 0.0)))
     (when *flip-yz*
-      (gl:rotate -90.0 1.0 0.0 0.0))
+      (gl:rotate (if (numberp *flip-yz*) *flip-yz* -90.0) 1.0 0.0 0.0))
     (gl:scale s s s)
     (gl:translate (- (aref c 0)) (- (aref c 1)) (- (aref c 2)))))
 
@@ -338,7 +342,11 @@
   (when (eql key #\w)
     (setf *wire* (not *wire*)))
   (when (eql key #\z)
-    (setf *flip-yz*(not *flip-yz*)))
+    (setf *flip-yz* (if (numberp *flip-yz*)
+                        (mod (+ *flip-yz* 90.0) 360)
+                        270.0)))
+  (when (eql key #\Z)
+    (setf *flip-yz* nil))
 
   (when (eql key #\p)
     (next-file-key window -1))
@@ -379,3 +387,5 @@
 ;(ai-sample3)
 ;(ai-sample3 (cffi-sys:native-namestring (merge-pathnames "src/assimp/test/models/B3D/dwarf2.b3d" (user-homedir-pathname))))
 ;(cl-glut:main-loop)
+
+;(find-files (merge-pathnames "src/assimp/test/models" (user-homedir-pathname)))

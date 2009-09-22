@@ -549,7 +549,34 @@
        finally (progn (format t " == ~s~%" (alexandria:hash-table-plist hash))
                       (return hash)))))
 
-(defun translate-texture-array (a count))
+(defun translate-ai-texture (tx)
+  (cffi:with-foreign-slots ((%ai:m-width
+                             %ai:m-height
+                             %ai:ach-format-hint
+                             %ai:pc-data)
+                            tx %ai:ai-texture)
+    (when *translate-verbose*
+      (format t "loaded embedded texture ~s x ~s~%" %ai:m-width %ai:m-height))
+    (if (zerop %ai:m-width)
+        (list :raw-texture %ai:m-width %ai:m-height
+              (loop with a = (make-array %ai:m-width
+                                         :element-type '(unsigned-byte 8))
+                 for i below %ai:m-width
+                 do (setf (aref a i)
+                          (cffi:mem-aref %ai:pc-data :unsigned-char))
+                 finally (return a))
+              %ai:ach-format-hint)
+        (list :bgra %ai:m-width %ai:m-height
+              ;; linear rgba to simplify passing to GL, possibly
+              ;; should add other options?
+              (loop with a = (make-array (* %ai:m-width %ai:m-height 4)
+                                         :element-type '(unsigned-byte 8)
+                                         :initial-element 255)
+                 for i below (* %ai:m-width %ai:m-height 4)
+                 do (setf (aref a i)
+                                (cffi:mem-aref %ai:pc-data :unsigned-char i))
+                 finally (return a))))))
+
 (defun translate-light-array (a count))
 (defun translate-camera-array (a count))
 
@@ -569,11 +596,12 @@
      'root (translate-ai-node %ai:m-root-node)
      'meshes (translate-ai-array translate-ai-mesh
                                  %ai:m-num-meshes %ai:m-meshes)
-     'materials (print (translate-ai-array translate-ai-material
-                                     %ai:m-num-materials %ai:m-materials))
+     'materials (translate-ai-array translate-ai-material
+                                     %ai:m-num-materials %ai:m-materials)
      'animations (translate-ai-array translate-ai-animation
                                      %ai:m-num-animations %ai:m-animations)
-     'textures (translate-texture-array %ai:m-textures %ai:m-num-textures)
+     'textures  (translate-ai-array translate-ai-texture
+                                    %ai:m-num-textures %ai:m-textures)
      'lights (translate-light-array %ai:m-lights %ai:m-num-lights)
      'cameras (translate-camera-array %ai:m-cameras %ai:m-num-cameras)
      ))
