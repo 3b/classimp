@@ -577,7 +577,49 @@
                                 (cffi:mem-aref %ai:pc-data :unsigned-char i))
                  finally (return a))))))
 
-(defun translate-light-array (a count))
+(defun translate-ai-light (l)
+  (cffi:with-foreign-slots ((%ai:m-name
+                             %ai:m-type
+                             %ai:m-position
+                             %ai:m-direction
+                             %ai:m-attenuation-constant
+                             %ai:m-attenuation-linear
+                             %ai:m-attenuation-quadratic
+                             %ai:m-color-diffuse
+                             %ai:m-color-specular
+                             %ai:m-color-ambient
+                             %ai:m-angle-inner-cone
+                             %ai:m-angle-outer-cone)
+                            l %ai:ai-light)
+    (format t "translating light = ")
+    (print (ecase %ai:m-type
+       (:ai-light-source-directional
+        (list %ai:m-type
+              :name (translate-ai-string %ai:m-name)
+              :direction (translate-ai-vector3d %ai:m-direction)
+              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+              :specular (translate-ai-vector3d %ai:m-color-specular)
+              :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+
+       (:ai-light-source-point
+        (list %ai:m-type
+              :name (translate-ai-string %ai:m-name)
+              :position (translate-ai-vector3d %ai:m-position)
+              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+              :specular (translate-ai-vector3d %ai:m-color-specular)
+              :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+
+       (:ai-light-source-spot
+        (list %ai:m-type
+              :name (translate-ai-string %ai:m-name)
+              :position (translate-ai-vector3d %ai:m-position)
+              :direction (translate-ai-vector3d %ai:m-direction)
+              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+              :specular (translate-ai-vector3d %ai:m-color-specular)
+              :ambient (translate-ai-vector3d %ai:m-color-ambient)
+              :inner-angle %ai:m-angle-inner-cone
+              :outer-angle %ai:m-angle-outer-cone))))))
+
 (defun translate-camera-array (a count))
 
 (defun translate-ai-scene (scene)
@@ -600,9 +642,10 @@
                                      %ai:m-num-materials %ai:m-materials)
      'animations (translate-ai-array translate-ai-animation
                                      %ai:m-num-animations %ai:m-animations)
-     'textures  (translate-ai-array translate-ai-texture
+     'textures (translate-ai-array translate-ai-texture
                                     %ai:m-num-textures %ai:m-textures)
-     'lights (translate-light-array %ai:m-lights %ai:m-num-lights)
+     'lights (translate-ai-array translate-ai-light
+                         %ai:m-num-lights %ai:m-lights)
      'cameras (translate-camera-array %ai:m-cameras %ai:m-num-cameras)
      ))
   )

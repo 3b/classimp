@@ -40,6 +40,9 @@
   (gl:enable :depth-test :multisample))
 
 (defparameter *flip-yz* nil)
+(defparameter *use-lights* t)
+(defparameter *invert-texture-v* nil)
+(defparameter *invert-normals* nil)
 (defparameter *tris* 0)
 (defparameter *spin* nil)
 (defparameter *anim-speed* 0.2)
@@ -156,6 +159,7 @@
             (let ((uvx (car (gethash "$tex.uvtrafo" material))))
               (gl:matrix-mode :texture)
               (gl:load-identity)
+              (when *invert-texture-v* (gl:scale 1.0 -1.0 1.0))
               (when uvx
                 ;; not sure about order of these...
                 (destructuring-bind (type index (x s r)) uvx
@@ -258,8 +262,9 @@
                        for v = (aref vertices i)
                        do
                        (when normals
-                         (let ((n (sb-cga:normalize (aref (ai:normals mesh)
-                                                          i))))
+                         (let ((n (sb-cga:vec* (sb-cga:normalize
+                                                (aref (ai:normals mesh) i))
+                                               (if *invert-normals* -1.0 1.0))))
                            (gl:normal (aref n 0) (aref n 1) (aref n 2))))
                        (when (and (ai:colors mesh)
                                   (> (length (ai:colors mesh)) 0))
@@ -280,6 +285,15 @@
               do (r scene child)))))
     (r (scene w) (ai:root-node (scene w)))))
 
+(defmethod set-up-lights ((w ai-sample3-window))
+  (when (and *use-lights* (ai:lights (scene w)))
+    ;; fixme: don't disable active lights..
+    (gl:disable :light1 :light2 :light3 :light4 :light5 :light6 :light7)
+    (loop for light across (ai:lights (scene w))
+       for enum in '(:light0 :light1 :light2 :light3
+                     :light4 :light5 :light6 :light7)
+       do (activate-light enum light (scene-scale w)))))
+
 (defmethod xform ((w ai-sample3-window))
   (if *wire*
       (gl:polygon-mode :front :line)
@@ -289,20 +303,36 @@
   (gl:color-material :front-and-back :ambient-and-diffuse)
   (gl:matrix-mode :modelview)
   (gl:load-identity)
-  (gl:light :light0 :position '(2.0 1.0 0.5 0.0))
+
   (glu:look-at 0.0 0.5 3.0
                0.0 0.0 0.0
                0.0 1.0 0.0)
+
+  (unless (and *use-lights* (ai:lights (scene w)))
+    (when *dump* (format t "activate default light~%"))
+    (gl:disable :light1 :light2 :light3 :light4 :light5 :light6 :light7)
+    (gl:enable :light0)
+    (gl:light :light0 :position '(10.0 7.0 5.0 0.0))
+    (gl:light :light0 :ambient '(0.0 0.0 0.0 1.0))
+    (gl:light :light0 :diffuse '(0.8 0.8 0.8 1.0))
+    (gl:light :light0 :specular '(0.0 0.0 1.0 1.0))
+    (gl:light :light0 :spot-cutoff 180.0))
+
   (let ((s (scene-scale w))
         (c (scene-center w)))
     (when *spin*
       (if (numberp *spin*)
           (gl:rotate (float *spin* 1.0) 0.0 1.0 0.0)
           (gl:rotate (spin) 0.0 1.0 0.0)))
+
     (when *flip-yz*
       (gl:rotate (if (numberp *flip-yz*) *flip-yz* -90.0) 1.0 0.0 0.0))
+
+
     (gl:scale s s s)
-    (gl:translate (- (aref c 0)) (- (aref c 1)) (- (aref c 2)))))
+    (gl:translate (- (aref c 0)) (- (aref c 1)) (- (aref c 2))))
+    (set-up-lights w)
+)
 
 (defmethod glut:display ((w ai-sample3-window))
   (gl:clear :color-buffer-bit :depth-buffer-bit)
@@ -316,6 +346,10 @@
         (recursive-render w))
       (when *dump*
         (setf *dump* nil)
+        (format t "scene lights are ~s~%" (if (ai:lights (scene w))
+                                              (if *use-lights* "active"
+                                                  "disabled")
+                                              "unavailable"))
         (format t "drew ~s tris~%" *tris*))))
   (glut:swap-buffers))
 
@@ -347,6 +381,12 @@
                         270.0)))
   (when (eql key #\Z)
     (setf *flip-yz* nil))
+  (when (eql key #\i)
+    (setf *invert-texture-v* (not *invert-texture-v*)))
+  (when (eql key #\I)
+    (setf *invert-normals* (not *invert-normals*)))
+  (when (eql key #\l)
+    (setf *use-lights* (not *use-lights*)))
 
   (when (eql key #\p)
     (next-file-key window -1))
@@ -389,3 +429,7 @@
 ;(cl-glut:main-loop)
 
 ;(find-files (merge-pathnames "src/assimp/test/models" (user-homedir-pathname)))
+
+;(ai-sample3 "/tmp/JaiquaFromXSI.dae")
+
+;(ai-sample3 "/tmp/cube.dae")

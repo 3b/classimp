@@ -74,6 +74,31 @@
   (float (* 50 (/ (get-internal-real-time)
                   (float internal-time-units-per-second)))))
 
+(defun v3->v4 (v &optional w)
+  (vector (aref v 0) (aref v 1) (aref v 2) w))
+
+(defun activate-light (enum light &optional (s 1.0))
+  (gl:enable enum)
+  (destructuring-bind (type &key name direction position
+                            diffuse specular ambient
+                            inner-angle outer-angle) light
+    (declare (ignore name inner-angle))
+    (gl:light enum :ambient (v3->v4 ambient 1.0))
+    (gl:light enum :diffuse (v3->v4 diffuse 1.0))
+    (gl:light enum :specular (v3->v4 specular 1.0))
+    (case type
+      (:ai-light-source-directional
+       (gl:light enum :position (v3->v4 (sb-cga:vec* direction -1.0) 0.0)))
+      (:ai-light-source-point
+       (gl:light enum :position (v3->v4 position 1.0)))
+      (:ai-light-source-spot
+       (gl:light enum :position (v3->v4 position 1.0))
+       (gl:light enum :spot-direction direction)
+       ;; fixme: use inner-angle to calculate :spot-exponent
+       (gl:light enum :spot-cutoff (* outer-angle (/ 180.0 pi)))
+       (gl:light enum :spot-direction direction)))))
+
+
 (defparameter *filename* nil)
 (defun unload-textures (window)
   (when (and window (scene window))
@@ -141,7 +166,7 @@
                    with (car . d) = (pathname-directory (truename *filename*))
                    for base on (reverse d)
                    for base-path = (make-pathname :directory (cons car (reverse base)))
-                   do (format t "base dir ~s~%" base-path)
+                   ;;do (format t "base dir ~s~%" base-path)
                    when (probe-file (merge-pathnames cleaned base-path))
                    return  (setf final-path
                                  (cffi-sys:native-namestring

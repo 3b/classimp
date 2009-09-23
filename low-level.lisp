@@ -228,12 +228,11 @@
   (ach-format-hint :char :count 4)
   (pc-data :pointer))
 
-(cffi:defcenum ai-light-source-type
+(cffi:defcenum (ai-light-source-type :int)
   (:ai-light-source-undefined 0)
   (:ai-light-source-directional 1)
   (:ai-light-source-point 2)
-  (:ai-light-source-spot 3)
-  (:_ai-light-source-force-32-bit -1610612737))
+  (:ai-light-source-spot 3))
 
 (cffi:defcstruct ai-light
   (m-name ai-string)
