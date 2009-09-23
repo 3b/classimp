@@ -620,7 +620,26 @@
               :inner-angle %ai:m-angle-inner-cone
               :outer-angle %ai:m-angle-outer-cone))))))
 
-(defun translate-camera-array (a count))
+(defun translate-ai-camera (c)
+  (cffi:with-foreign-slots ((%ai:m-name
+                             %ai:m-position
+                             %ai:m-up
+                             %ai:m-look-at
+                             %ai:m-horizontal-fov
+                             %ai:m-clip-plane-near
+                             %ai:m-clip-plane-far
+                             %ai:m-aspect)
+                            c %ai:ai-camera)
+    (when *translate-verbose*
+      (format t "translate camera ~s~%" (translate-ai-string %ai:m-name)))
+    (list (translate-ai-string %ai:m-name)
+          :position (translate-ai-vector3d %ai:m-position)
+          :up (translate-ai-vector3d %ai:m-up)
+          :look-at (translate-ai-vector3d %ai:m-look-at)
+          :horizontal-fov %ai:m-horizontal-fov
+          :clip-near %ai:m-clip-plane-near
+          :clip-far %ai:m-clip-plane-far
+          :aspect %ai:m-aspect)))
 
 (defun translate-ai-scene (scene)
   (cffi:with-foreign-slots ((%ai:m-flags
@@ -645,10 +664,9 @@
      'textures (translate-ai-array translate-ai-texture
                                     %ai:m-num-textures %ai:m-textures)
      'lights (translate-ai-array translate-ai-light
-                         %ai:m-num-lights %ai:m-lights)
-     'cameras (translate-camera-array %ai:m-cameras %ai:m-num-cameras)
-     ))
-  )
+                                 %ai:m-num-lights %ai:m-lights)
+     'cameras (translate-ai-array translate-ai-camera
+                                  %ai:m-num-cameras %ai:m-cameras))))
 
 ;; copied from cl-glut
 (defmacro without-fp-traps (&body body)
