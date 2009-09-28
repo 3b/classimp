@@ -21,11 +21,10 @@
   (m-clip-plane-far :float)
   (m-aspect :float))
 
-(cffi:defcenum ai-origin
+(cffi:defcenum (ai-origin :int)
   (:ai-origin-set 0)
   (:ai-origin-cur 1)
-  (:ai-origin-end 2)
-  (:_ai-origin-enforce-enum-size 2147483647))
+  (:ai-origin-end 2))
 
 (cffi:defcstruct ai-color-3d
   (r :float)
@@ -47,11 +46,10 @@
   (x :float)
   (y :float))
 
-(cffi:defcenum ai-return
+(cffi:defcenum (ai-return :int)
   (:ai-return-success 0)
   (:ai-return-failure -1)
-  (:ai-return-outofmemory -3)
-  (:_ai-enforce-enum-size 2147483647))
+  (:ai-return-outofmemory -3))
 
 (cffi:defcstruct ai-vector-key
   (m-time :double)
@@ -67,12 +65,11 @@
   (m-time :double)
   (m-value ai-quaternion))
 
-(cffi:defcenum ai-anim-behaviour
+(cffi:defcenum (ai-anim-behaviour :unsigned-int)
   (:ai-anim-behaviour-default 0)
   (:ai-anim-behaviour-constant 1)
   (:ai-anim-behaviour-linear 2)
-  (:ai-anim-behaviour-repeat 3)
-  (:_ai-anim-behaviour-force-32-bit -1879048193))
+  (:ai-anim-behaviour-repeat 3))
 
 (cffi:defcstruct ai-node-anim
   (m-node-name ai-string)
@@ -431,7 +428,7 @@
 
 (cffi::defctype ai-file-tell-proc :pointer)
 
-(cffi:defcenum ai-component
+(cffi:defcenum (ai-component :unsigned-int)
   (:ai-component-normals 2)
   (:ai-component-tangents-and-bitangents 4)
   (:ai-component-colors 8)
@@ -442,8 +439,7 @@
   (:ai-component-lights 256)
   (:ai-component-cameras 512)
   (:ai-component-meshes 1024)
-  (:ai-component-materials 2048)
-  (:_ai-component-force-32-bit -1610612737))
+  (:ai-component-materials 2048))
 
 (cffi::defctype ai-file-open-proc :pointer)
 
@@ -605,12 +601,11 @@
 (cffi:defcfun ("aiMultiplyMatrix4" ai-multiply-matrix-4) :void (dst :pointer)
               (src :pointer))
 
-(cffi:defcenum ai-primitive-type
+(cffi:defcenum (ai-primitive-type :unsigned-int)
   (:ai-primitive-type-point 1)
   (:ai-primitive-type-line 2)
   (:ai-primitive-type-triangle 4)
-  (:ai-primitive-type-polygon 8)
-  (:_ai-primitive-type-force-32-bit -1610612737))
+  (:ai-primitive-type-polygon 8))
 
 (cffi:defcfun ("aiApplyPostProcessing" ai-apply-post-processing) :pointer
   (p-scene :pointer)
