@@ -323,16 +323,21 @@
   (:ai-process-flip-u-vs #x800000)
   (:ai-process-flip-winding-order #x1000000)
 
-  (:ai-process-convert-to-left-handed (:ai-process-make-left-handed
-                                       :ai-process-flip-u-vs
-                                       :ai-process-flip-winding-order))
-  (:ai-process-preset-target-realtime-fast (:ai-process-calc-tangent-space
+  (:ai-process-convert-to-left-handed #x1800004
+                                      #-(and) (:ai-process-make-left-handed
+                                               :ai-process-flip-u-vs
+                                               :ai-process-flip-winding-order))
+  (:ai-process-preset-target-realtime-fast #x4802B
+                                           #- (and)
+                                           (:ai-process-calc-tangent-space
                                             :ai-process-gen-normals
                                             :ai-process-join-identical-vertices
                                             :ai-process-triangulate
                                             :ai-process-gen-uv-coords
                                             :ai-process-sort-by-p-type))
   (:ai-process-preset-target-realtime-quality
+   #x79ACB
+   #- (and)
    (:ai-process-calc-tangent-space
     :ai-process-gen-smooth-normals
     :ai-process-join-identical-vertices
@@ -346,12 +351,12 @@
     :ai-process-find-degenerates
     :ai-process-find-invalid-data))
   (:ai-process-preset-target-realtime-max-quality
+   #x379ECB
+   #- (and)
    (:ai-process-preset-target-realtime-quality
     :ai-process-find-instances
     :ai-process-validate-data-structure
-    :ai-process-optimize-meshes))
-
-  )
+    :ai-process-optimize-meshes)))
 
 
 (cffi:defcfun ("aiImportFile" ai-import-file) :pointer
