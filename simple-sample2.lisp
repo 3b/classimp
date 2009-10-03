@@ -24,7 +24,7 @@
   (gl:enable :depth-test :multisample))
 
 (defparameter *tris* 0)
-(defparameter *spin* nil)
+(defparameter *spin* t)
 (defparameter *anim-speed* 0.2)
 (defparameter *wire* t)
 (defparameter *dump* nil)

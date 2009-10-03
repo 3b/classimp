@@ -44,8 +44,8 @@
 (defparameter *invert-texture-v* nil)
 (defparameter *invert-normals* nil)
 (defparameter *tris* 0)
-(defparameter *spin* nil)
-(defparameter *anim-speed* 0.2)
+(defparameter *spin* t)
+(defparameter *anim-speed* 0.8)
 (defparameter *wire* t)
 (defparameter *dump* nil)
 
