@@ -15,6 +15,10 @@
                      :mode '(:double :rgb :depth :multisample)))
 
 (defmethod glut:display-window :before ((window ai-sample2-window))
+  (il:init)
+  (ilut:init)
+  (ilut:renderer :opengl)
+  (ilut:enable :opengl-conv)
   (setf (values (bounds-min window) (bounds-max window))
         (scene-bounds (scene window)))
   (gl:polygon-mode :front :fill)
