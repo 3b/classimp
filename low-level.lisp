@@ -138,6 +138,7 @@
   (m-num-properties :unsigned-int)
   (m-num-allocated :unsigned-int))
 
+#-old-assimp
 (cffi:defcfun ("aiGetMaterialProperty" ai-get-material-property) ai-return
   (p-mat :pointer)
   (p-key :pointer)
@@ -385,10 +386,13 @@
 
 (cffi:defcfun ("aiGetVersionRevision" ai-get-version-revision) :unsigned-int)
 
+#-old-assimp
 (cffi:defcfun ("aiIdentityMatrix3" ai-identity-matrix-3) :void (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiIdentityMatrix4" ai-identity-matrix-4) :void (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiDetachAllLogStreams" ai-detach-all-log-streams) :void)
 
 (cffi::defctype ai-log-stream-callback :pointer)
@@ -403,6 +407,7 @@
   (:ai-default-log-stream-stderr 4)
   (:ai-default-log-stream-debugger 8))
 
+#-old-assimp
 (cffi:defcfun ("aiGetPredefinedLogStream" ai-get-predefined-log-stream)
     ai-log-stream
   (p-streams ai-default-log-stream)
@@ -524,14 +529,17 @@
   (c :float)
   (d :float))
 
+#-old-assimp
 (cffi:defcfun ("aiTransformVecByMatrix3" ai-transform-vec-by-matrix-3) :void
   (vec :pointer)
   (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiTransformVecByMatrix4" ai-transform-vec-by-matrix-4) :void
   (vec :pointer)
   (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiDetachLogStream" ai-detach-log-stream) ai-return
   (stream :pointer))
 
@@ -541,9 +549,11 @@
   (sz-name :pointer)
   (st :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiEnableVerboseLogging" ai-enable-verbose-logging) :void
   (d ai-bool))
 
+#-old-assimp
 (cffi:defcfun ("aiAttachLogStream" ai-attach-log-stream) :void (stream :pointer))
 
 (cffi:defcfun ("aiGetMaterialIntegerArray" ai-get-material-integer-array) ai-return
@@ -591,13 +601,17 @@
 
 (cffi:defcfun ("aiReleaseImport" ai-release-import) :void (p-scene :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiTransposeMatrix3" ai-transpose-matrix-3) :void (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiTransposeMatrix4" ai-transpose-matrix-4) :void (mat :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiMultiplyMatrix3" ai-multiply-matrix-3) :void (dst :pointer)
               (src :pointer))
 
+#-old-assimp
 (cffi:defcfun ("aiMultiplyMatrix4" ai-multiply-matrix-4) :void (dst :pointer)
               (src :pointer))
 
@@ -607,14 +621,17 @@
   (:ai-primitive-type-triangle 4)
   (:ai-primitive-type-polygon 8))
 
+#-old-assimp
 (cffi:defcfun ("aiApplyPostProcessing" ai-apply-post-processing) :pointer
   (p-scene :pointer)
   (p-flags :unsigned-int))
 
+#-old-assimp
 (cffi:defcfun ("aiGetMaterialTextureCount" ai-get-material-texture-count) :unsigned-int
   (p-mat :pointer)
   (type ai-texture-type))
 
+#-old-assimp
 (cffi:defcfun ("aiImportFileFromMemory" ai-import-file-from-memory) :pointer
   (p-buffer :pointer)
   (p-length :unsigned-int)
