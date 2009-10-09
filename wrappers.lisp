@@ -1,6 +1,7 @@
 (in-package #:classimp)
 
 (defparameter *loader-default-animation-ticks-per-second* 24.0)
+(defparameter *loader-translate-times* t)
 (defparameter *translate-verbose* nil)
 
 (defclass node ()
@@ -188,7 +189,8 @@
             'node
             'name (translate-ai-string %ai:m-name)
             'transform (translate-ai-matrix-4x4 %ai:m-transformation)
-            'parent %ai:m-parent ;; we replace this later, since we might not have created parent yet
+            ;; we replace this later, since we might not have created parent yet
+            'parent (unless (cffi:null-pointer-p %ai:m-parent) %ai:m-parent)
             'children (make-array
                        %ai:m-num-children
                        :initial-contents
@@ -355,26 +357,28 @@
                                 %ai:m-bones)
      'material-index %ai:m-material-index)))
 
-(defparameter *translate-anim-node-ticke-per-second* 0.0)
+(defparameter *translate-anim-node-ticks-per-second* 0.0)
 
 (defun translate-ai-vector-key (k)
   (cffi:with-foreign-slots ((%ai:m-time
                              %ai:m-value) k %ai:ai-vector-key)
     (make-instance 'vector-key
-                   'time (if (zerop *translate-anim-node-ticke-per-second*)
+                   'time (if (or (not *loader-translate-times*)
+                                 (zerop *translate-anim-node-ticks-per-second*))
                              %ai:m-time
                              (/ %ai:m-time
-                                *translate-anim-node-ticke-per-second*))
+                                *translate-anim-node-ticks-per-second*))
                    'value (translate-ai-vector3d %ai:m-value))))
 
 (defun translate-ai-quaternion-key (k)
   (cffi:with-foreign-slots ((%ai:m-time
                              %ai:m-value) k %ai:ai-quat-key)
     (make-instance 'vector-key
-                   'time (if (zerop *translate-anim-node-ticke-per-second*)
+                   'time (if (or (not *loader-translate-times*)
+                                 (zerop *translate-anim-node-ticks-per-second*))
                              %ai:m-time
                              (/ %ai:m-time
-                                *translate-anim-node-ticke-per-second*))
+                                *translate-anim-node-ticks-per-second*))
                    'value (translate-ai-vector4 %ai:m-value))))
 
 (defun translate-ai-anim-node (a)
@@ -419,7 +423,7 @@
       (format t "load animation ~s, ~s channels~%"
              (translate-ai-string %ai:m-name)
              %ai:m-num-channels))
-    (let* ((*translate-anim-node-ticke-per-second*
+    (let* ((*translate-anim-node-ticks-per-second*
             (if (zerop %ai:m-ticks-per-second)
                 *loader-default-animation-ticks-per-second*
                 %ai:m-ticks-per-second))
@@ -432,9 +436,11 @@
       (make-instance
        'animation
        'name (translate-ai-string %ai:m-name)
-       'duration (if (zerop %ai:m-ticks-per-second)
-                     (/ %ai:m-duration *loader-default-animation-ticks-per-second*)
-                     (/ %ai:m-duration %ai:m-ticks-per-second))
+       'duration (if *loader-translate-times*
+                     (if (zerop %ai:m-ticks-per-second)
+                         (/ %ai:m-duration *loader-default-animation-ticks-per-second*)
+                         (/ %ai:m-duration %ai:m-ticks-per-second))
+                     %ai:m-duration)
        'ticks-per-second %ai:m-ticks-per-second
        'channels channels
        'index index))))
@@ -676,8 +682,9 @@
   #-(and sbcl (or x86 x86-64))
   `(progn ,@body))
 
-(defun import-into-lisp (filename &rest processing-flags)
-  (let ((raw-scene nil))
+(defun import-into-lisp (filename &key processing-flags raw-times)
+  (let ((raw-scene nil)
+        (*loader-translate-times* (not raw-times)))
     (prog1
         (unwind-protect
           (progn

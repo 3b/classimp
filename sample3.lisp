@@ -24,6 +24,7 @@
          (d (sb-cga:vec- max min))
          (s (/ 1.0 (max (aref d 0) (aref d 1) (aref d 2))))
          (c (sb-cga:vec/ (sb-cga:vec+ min max) 2.0)))
+    (format t "bounds = ~s - ~s~%, s=~s c=~s~%" min max s c)
     (setf (scene-scale window) (* 0.95 s))
     (setf (scene-center window) c)))
 
@@ -56,15 +57,14 @@
 
 (defmethod animate-bones ((w ai-sample3-window))
   ;; update node transform (probably should just do this one at load)
-  (labels ((nx (n)
+  (labels ((nx (n pm)
              (let* ((m (ai:transform n))
-                    (*current-bone-transform*
-                     (sb-cga:matrix* m *current-bone-transform*)))
-               (setf (gethash (ai:name n) *node-transforms*)
-                     *current-bone-transform*)
+                    (pm (sb-cga:matrix* m pm)))
+               (setf (gethash (ai:name n) *node-transforms*) pm)
                (loop for child across (ai:children n)
-                  do (nx child)))))
-    (nx (ai:root-node (scene w))))
+                  do (nx child pm)))))
+    (nx (ai:root-node (scene w)) (sb-cga:identity-matrix)))
+
   (unless (zerop (length (ai:animations (scene w))))
     (loop
       with anims = (ai:animations (scene w))
@@ -176,21 +176,20 @@
   (labels
       ((r (scene node)
          (gl:with-pushed-matrix
-           (when (gethash (ai:name node) *node-transforms*)
+           #++(when (gethash (ai:name node) *node-transforms*)
              (gl:with-pushed-matrix
                (gl:mult-transpose-matrix (gethash (ai:name node)
                                                   *node-transforms*))
                (gl:color 0.5 0.4 1.0 1.0)
                (axes (* (scene-scale w) 0.05))))
-           (when (gethash (ai:name node) *bone-transforms*)
+           #++(when (gethash (ai:name node) *bone-transforms*)
              (gl:with-pushed-matrix
                (gl:mult-matrix (gethash (ai:name node) *bone-transforms*))
                (gl:color 1.5 0.4 0.0 1.0)
                (axes (* (scene-scale w) 0.1))))
            (gl:with-pushed-matrix
-             (gl:mult-matrix (sb-cga:transpose-matrix
+             #++(gl:mult-matrix (sb-cga:transpose-matrix
                               (gethash (ai:name node) *node-transforms*)))
-
             (loop
                with node-meshes = (ai:meshes node)
                with scene-meshes = (ai:meshes scene)
@@ -209,15 +208,16 @@
                      for bone across bones
                      for ofs = (ai:offset-matrix bone)
                      for bx = (gethash (ai:name bone) *bone-transforms*)
-                     for bnx = (gethash (ai:name bone) *node-transforms*)
-                     for nx = (gethash (ai:name node) *node-transforms*)
+                     ;for bnx = (gethash (ai:name bone) *node-transforms*)
+                     ;for nx = (gethash (ai:name node) *node-transforms*)
                      for mm = (if (and ofs bx)
                                   (sb-cga:matrix*
-                                   (sb-cga:transpose-matrix (sb-cga:inverse-matrix nx))
-                                   bx (sb-cga:transpose-matrix ofs)
-                                   ;(sb-cga:inverse-matrix (sb-cga:transpose-matrix nx))
-
-)
+                                   #++(sb-cga:transpose-matrix (sb-cga:inverse-matrix nx))
+                                   bx
+                                   (sb-cga:transpose-matrix ofs)
+                                   ;;(sb-cga:transpose-matrix bx)
+                                   ;;(sb-cga:inverse-matrix (sb-cga:transpose-matrix nx))
+                                   )
                                   (or ofs bx))
                      do (when mm
                           (loop for w across (ai:weights bone)
@@ -335,6 +335,7 @@
 )
 
 (defmethod glut:display ((w ai-sample3-window))
+  (update-fps)
   (gl:clear :color-buffer-bit :depth-buffer-bit)
   (when (and (slot-boundp w 'scene)
              (scene w))
@@ -342,8 +343,14 @@
     (let ((*tris* 0))
       (let ((*bone-transforms* (make-hash-table :test 'equal))
             (*node-transforms* (make-hash-table :test 'equal)))
-        (animate-bones w)
-        (recursive-render w))
+        (gl:translate 15 0 -7)
+        (loop for j below 5
+           do (gl:translate -30 0 3)
+             (loop for i below 10
+                 do (gl:translate 3 0 3)
+                 (animate-bones w)
+                 (recursive-render w)))
+)
       (when *dump*
         (setf *dump* nil)
         (format t "scene lights are ~s~%" (if (ai:lights (scene w))

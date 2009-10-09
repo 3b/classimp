@@ -57,4 +57,6 @@
            #:scaling-keys
            #:value
            #:with-log-to-file
-           #:with-log-to-stdout))
+           #:with-log-to-stdout
+           #:pre-state
+           #:post-state))

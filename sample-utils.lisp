@@ -188,8 +188,8 @@
     (format t "reload scene -> ~s~%" *filename*)
     (let ((s (ai:import-into-lisp
               (cffi-sys:native-namestring (truename *filename*))
-              :ai-process-validate-data-structure
-              :ai-process-preset-target-realtime-quality)))
+              :processing-flags '(:ai-process-validate-data-structure
+                                  :ai-process-preset-target-realtime-quality))))
       (when (and window s)
         (unload-textures window)
         (setf (scene window) s)
@@ -201,3 +201,26 @@
           (format t "loaded ~s~%" *filename*)
           (format t "failed to load ~s~%" *filename*))
       s)))
+
+(defparameter *frame-count* 0)
+(defparameter *last-fps-message-time* 0)
+(defparameter *last-fps-message-frame-count* 0)
+(defparameter *fps-message-interval* 2.000) ;; in second
+
+(defun update-fps ()
+  ;; update the frame count
+  (incf *frame-count*)
+  ;; handle tick count wrapping to 0
+  (let ((now (/ (get-internal-real-time) internal-time-units-per-second)))
+    (when (< now *last-fps-message-time*)
+     (setf *last-fps-message-time* now))
+    ;; see if it is time for next message
+    (when (>= now (+ *last-fps-message-time* *fps-message-interval*))
+      (let ((frames (- *frame-count* *last-fps-message-frame-count*))
+            (seconds (- now *last-fps-message-time*)))
+        (format t "~s seconds: ~s fps, ~s ms per frame~%"
+                (float seconds)
+               (if (zerop seconds) "<infinite>" (float (/ frames seconds)))
+               (if (zerop frames) "<infinite>" (float (/ seconds frames)))))
+     (setf *last-fps-message-time* now)
+     (setf *last-fps-message-frame-count* *frame-count*))))
