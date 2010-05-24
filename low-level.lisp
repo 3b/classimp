@@ -6,6 +6,10 @@
   (length size-t)
   (data :char :count 1024))
 
+(cffi:defcstruct ai-string32
+  (length :uint32)
+  (data :char :count 1024))
+
 (cffi:defcstruct ai-vector-3d
   (x :float)
   (y :float)

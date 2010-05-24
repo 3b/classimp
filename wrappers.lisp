@@ -167,6 +167,11 @@
   (cffi:with-foreign-slots ((%ai:length %ai:data) str %ai:ai-string)
     (decode-string %ai:data %ai:length)))
 
+;; material properties use u32 for length instead of size_t
+(defun translate-ai-string32 (str)
+  (cffi:with-foreign-slots ((%ai:length %ai:data) str %ai::ai-string32)
+    (decode-string %ai:data %ai:length)))
+
 (defun translate-ai-matrix-4x4 (m)
   (when (not (cffi:null-pointer-p m))
     (make-array 16 :element-type 'single-float
@@ -465,7 +470,7 @@
       (let ((data (ecase %ai:m-type
                     (:ai-pti-float (data-array 'single-float :float))
                     (:ai-pti-integer (data-array '(signed-byte 32) :int))
-                    (:ai-pti-string (translate-ai-string %ai:m-data))
+                    (:ai-pti-string (translate-ai-string32 %ai:m-data))
                     (:ai-pti-buffer (data-array '(unsigned-byte 8) :unsigned-char)))))
         (if (eq %ai:m-semantic :ai-texture-type-none)
             (format t "material property: ~s = ~s~%" key data)
@@ -723,12 +728,12 @@
     `(cffi:with-foreign-object (,log '%ai:ai-log-stream)
        (setf (cffi:foreign-slot-value ,log '%ai:ai-log-stream '%ai:callback)
                 (cffi:callback log-to-*standard-output*))
-       #+fixed-logging
+       #-classimp-broken-logging
        (%ai:ai-attach-log-stream ,log)
        (unwind-protect
             (progn
               ,@body)
-         #+fixed-logging
+         #-classimp-broken-logging
          (%ai:ai-detach-log-stream ,log)))))
 
 ;; todo: more loggers, file etc...
