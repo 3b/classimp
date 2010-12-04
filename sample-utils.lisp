@@ -27,6 +27,14 @@
 
 (defun nqlerp (a b f)
   (let ((f2 (- 1.0 f)))
+    ;; make sure we get shortest path between orientations
+    ;; (if (a dot b) < 0, negate b)
+    (let ((d (+ (* (aref a 0) (aref b 0))
+                (* (aref a 1) (aref b 1))
+                (* (aref a 2) (aref b 2))
+                (* (aref a 3) (aref b 3)))))
+      (when (< d 0)
+        (map-into b #'- b)))
     (macrolet ((dim (n)
                  `(+ (* f2 (aref a ,n)) (* f (aref b ,n)))))
       (let* ((r0 (dim 0))
