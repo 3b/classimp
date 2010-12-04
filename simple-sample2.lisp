@@ -46,6 +46,11 @@
                      (sb-cga:matrix* m *current-bone-transform*)))
                (setf (gethash (ai:name n) *node-transforms*)
                      *current-bone-transform*)
+               ;; some collada files don't have anim info for every node
+               ;; (at least i think that is the problem) so make sure
+               ;; we have a valid bone-transform
+               (setf (gethash (ai:name n) *bone-transforms*)
+                     sb-cga:+identity-matrix+)
                (loop for child across (ai:children n)
                   do (nx child)))))
     (nx (ai:root-node (scene w))))
@@ -104,7 +109,9 @@
                     (*current-bone-transform*
                      (sb-cga:matrix* *current-bone-transform* m)))
                (setf (gethash (ai:name n) *bone-transforms*)
-                     *current-bone-transform*)
+                     (if (zerop (length (ai:animations (scene w))))
+                         (sb-cga:transpose-matrix (gethash (ai:name n) *node-transforms*))
+                         *current-bone-transform*))
                (loop for child across (ai:children n)
                   do (ax child)))))
     (ax (ai:root-node (scene w)))))
@@ -142,8 +149,9 @@
                     for ofs = (ai:offset-matrix bone)
                     for bx = (gethash (ai:name bone) *bone-transforms*)
                     for nx = (gethash (ai:name bone) *node-transforms*)
-                    for mm = (if (and ofs bx )
-                                 (sb-cga:matrix* bx (sb-cga:transpose-matrix ofs))
+                    for mm = (if (and ofs bx)
+                                 (sb-cga:matrix* bx
+                                                 (sb-cga:transpose-matrix ofs))
                                  (or ofs bx))
                     do (when mm
                          (loop for w across (ai:weights bone)
@@ -160,20 +168,23 @@
                                                  mm)
                                                 weight)))))
                     finally (setf vertices skinned-vertices))
-              do (gl:with-primitives :triangles
-                   (gl:color 0.0 1.0 0.0 1.0)
-                   (loop
-                      for face across faces
-                      do
-                      (incf *tris*)
-                      (loop
-                         for i across face
-                         for v = (aref vertices i)
-                         do
-                         (when (ai:normals mesh)
-                           (let ((n (sb-cga:normalize (aref (ai:normals mesh) i))))
-                             (gl:normal (aref n 0) (aref n 1) (aref n 2))))
-                         (gl:vertex (aref v 0) (aref v 1) (aref v 2))))))
+              do (gl:with-pushed-matrix
+                   (unless bones
+                     (gl:mult-matrix (gethash (ai:name node) *bone-transforms*)))
+                   (gl:with-primitives :triangles
+                     (gl:color 0.0 1.0 0.0 1.0)
+                     (loop
+                        for face across faces
+                        do
+                        (incf *tris*)
+                        (loop
+                           for i across face
+                           for v = (aref vertices i)
+                           do
+                           (when (ai:normals mesh)
+                             (let ((n (sb-cga:normalize (aref (ai:normals mesh) i))))
+                               (gl:normal (aref n 0) (aref n 1) (aref n 2))))
+                           (gl:vertex (aref v 0) (aref v 1) (aref v 2)))))))
            (loop for child across (ai:children node)
               do (r scene child)))))
     (r (scene w) (ai:root-node (scene w)))))
