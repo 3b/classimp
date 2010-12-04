@@ -697,7 +697,7 @@
             (setf raw-scene
                   (without-fp-traps
                     (%ai:ai-import-file
-                     filename
+                     (namestring filename)
                      (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
                                                   processing-flags))))
             (unless (cffi:null-pointer-p raw-scene)
