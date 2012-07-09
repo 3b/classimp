@@ -2,7 +2,7 @@
 (in-package #:classimp-sample)
 
 (defun quat->matrix (q)
-  (let ((w (aref q 0))
+  (let ((w (- (aref q 0)))
         (x (aref q 1))
         (y (aref q 2))
         (z (aref q 3)))

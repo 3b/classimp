@@ -134,6 +134,7 @@
   (m-data (:pointer :char)))
 
 (cffi:defcfun ("aiSetImportPropertyFloat" ai-set-import-property-float) :void
+  (store :pointer) ;; added in 3.0
   (sz-name :pointer)
   (value :float))
 
@@ -199,8 +200,21 @@
 
 ;; fixme: probably should grovel these, aiMesh.h says they shouldn't change
 ;; though, so ignoring for now...
-(cl:defconstant +ai-max-number-of-color-sets+ 4)
-(cl:defconstant +ai-max-number-of-texturecoords+ 4)
+;; ... they changed anyway :/
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+  (cl:defconstant +ai-max-number-of-color-sets+ 8)
+  (cl:defconstant +ai-max-number-of-texturecoords+ 8))
+
+;; 3.0 unused
+#++
+(cffi:defcstruct ai-anim-mesh
+  (m-vertices :pointer)
+  (m-normals :pointer)
+  (m-tangents :pointer)
+  (m-bitangents :pointer)
+  (m-colors :pointer :count #.+ai-max-number-of-color-sets+)
+  (m-texture-coords :pointer :count #.+ai-max-number-of-texturecoords+)
+  (m-num-vertices :unsigned-int))
 
 (cffi:defcstruct ai-mesh
   (m-primitive-types :unsigned-int)
@@ -210,13 +224,16 @@
   (m-normals :pointer)
   (m-tangents :pointer)
   (m-bitangents :pointer)
-  (m-colors :pointer :count 4) ;.+ai-max-number-of-color-sets+
-  (m-texture-coords :pointer :count 4) ;+ai-max-number-of-texturecoords+
-  (m-num-uv-components :unsigned-int :count 4);+ai-max-number-of-texturecoords+
+  (m-colors :pointer :count #.+ai-max-number-of-color-sets+)
+  (m-texture-coords :pointer :count #.+ai-max-number-of-texturecoords+)
+  (m-num-uv-components :unsigned-int :count #.+ai-max-number-of-texturecoords+)
   (m-faces :pointer)
   (m-num-bones :unsigned-int)
   (m-bones :pointer)
-  (m-material-index :unsigned-int))
+  (m-material-index :unsigned-int)
+  (m-name ai-string) ;; 3.0
+  (m-num-anim-meshes :unsigned-int) ;; 3.0, unused
+  (m-anim-meshes :pointer)) ;; 3.0 unused
 
 (cffi:defcstruct ai-texel
   (b :unsigned-char)
@@ -264,7 +281,8 @@
   (m-num-lights :unsigned-int)
   (m-lights :pointer)
   (m-num-cameras :unsigned-int)
-  (m-cameras :pointer))
+  (m-cameras :pointer)
+  (m-private :pointer)) ;; 3.0
 
 #+nil
 (cffi:defbitfield ai-post-process-steps
@@ -550,6 +568,7 @@
 (cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
 
 (cffi:defcfun ("aiSetImportPropertyString" ai-set-import-property-string) :void
+  (store :pointer) ;; added in 3.0
   (sz-name :pointer)
   (st :pointer))
 
@@ -588,6 +607,22 @@
   (p-flags ai-post-process-steps)
   (p-fs :pointer))
 
+;; 3.0
+(cffi:defcfun ("aiImportFileExWithProperties" ai-import-file-ex-with-properties) :pointer
+  (p-file :pointer)
+  (p-flags ai-post-process-steps)
+  (p-fs :pointer)
+  (p-props :pointer))
+
+;; 3.0
+(cffi:defcfun ("aiImportFileFromMemoryWithProperties" ai-import-file-from-memory-with-properties) :pointer
+  (p-buffer :pointer)
+  (p-length :unsigned-int)
+  (p-flags ai-post-process-steps)
+  (p-hint :string)
+  (p-props :pointer))
+
+
 (cffi:defcfun ("aiGetMaterialString" ai-get-material-string) ai-return
   (p-mat :pointer)
   (p-key :pointer)
@@ -600,6 +635,7 @@
   (:ai-blend-mode-additive 1))
 
 (cffi:defcfun ("aiSetImportPropertyInteger" ai-set-import-property-integer) :void
+  (store :pointer) ;; added in 3.0
   (sz-name :pointer)
   (value :int))
 
@@ -641,3 +677,11 @@
   (p-length :unsigned-int)
   (p-flags ai-post-process-steps)
   (p-hint :pointer))
+
+;; 3.0
+(cffi:defcfun ("aiCreatePropertyStore" ai-create-property-store) :pointer
+  )
+
+;; 3.0
+(cffi:defcfun ("aiReleasePropertyStore" ai-release-property-store) :void
+  (p :pointer))
