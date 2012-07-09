@@ -97,9 +97,9 @@
   (when (and (slot-boundp w 'scene)
              (scene w))
     (let ((*tris* 0))
-
-      (xform w)
-      (recursive-render (scene w) (ai:root-node (scene w)))
+      (with-simple-restart (continue "continue")
+        (xform w)
+        (recursive-render (scene w) (ai:root-node (scene w))))
       (when *dump*
        (setf *dump* nil)
        (format t "drew ~s tris~%" *tris*))))
@@ -137,7 +137,7 @@
   (ai:with-log-to-stdout ()
     (let ((scene
            (ai:import-into-lisp (cffi-sys:native-namestring (truename file))
-                                :ai-process-preset-target-realtime-quality)))
+                                :processing-flags '(:ai-process-preset-target-realtime-quality))))
       (when scene (glut:display-window (make-instance 'ai-sample-window
                                                       :scene scene))))))
 

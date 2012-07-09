@@ -210,8 +210,9 @@
       
       (let ((*bone-transforms* (make-hash-table :test 'equal))
             (*node-transforms* (make-hash-table :test 'equal)))
-        (animate-bones w)
-        (recursive-render w))
+        (with-simple-restart (continue "continue")
+          (animate-bones w)
+          (recursive-render w)))
       (when *dump*
         (setf *dump* nil)
         (format t "drew ~s tris~%" *tris*))))
@@ -260,9 +261,9 @@
   (ai:with-log-to-stdout ()
     (let ((scene
            (ai:import-into-lisp file
-                                :ai-process-preset-target-realtime-quality)))
+                                :processing-flags '(:ai-process-preset-target-realtime-quality))))
       (when scene (glut:display-window (make-instance 'ai-sample2-window
                                                       :scene scene))))))
 
 ;(ai-sample2)
-;(ai-sample2 (cffi-sys:native-namestring (merge-pathnames "src/assimp/test/models/X/dwarf.x" (user-homedir-pathname))))
+;(ai-sample2 (cffi-sys:native-namestring (merge-pathnames "src/assimp/test/models-nonbsd/X/dwarf.x" (user-homedir-pathname))))
