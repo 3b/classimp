@@ -16,7 +16,7 @@
   (z :float))
 
 (cffi:defcstruct ai-camera
-  (m-name ai-string)
+  (m-name (:struct ai-string))
   (m-position ai-vector-3d)
   (m-up ai-vector-3d)
   (m-look-at ai-vector-3d)
@@ -76,22 +76,22 @@
   (:ai-anim-behaviour-repeat 3))
 
 (cffi:defcstruct ai-node-anim
-  (m-node-name ai-string)
+  (m-node-name (:struct ai-string))
   (m-num-position-keys :unsigned-int)
-  (m-position-keys :pointer)
+  (m-position-keys (:pointer (:struct ai-vector-key)))
   (m-num-rotation-keys :unsigned-int)
-  (m-rotation-keys :pointer)
+  (m-rotation-keys (:pointer (:struct ai-quat-key)))
   (m-num-scaling-keys :unsigned-int)
-  (m-scaling-keys :pointer)
+  (m-scaling-keys (:pointer (:struct ai-vector-key)))
   (m-pre-state ai-anim-behaviour)
   (m-post-state ai-anim-behaviour))
 
 (cffi:defcstruct ai-animation
-  (m-name ai-string)
+  (m-name (:struct ai-string))
   (m-duration :double)
   (m-ticks-per-second :double)
   (m-num-channels :unsigned-int)
-  (m-channels :pointer))
+  (m-channels (:pointer (:pointer (:struct ai-node-anim))))) ;; [TODO] correct?
 
 (cffi:defcstruct ai-matrix-3x-3
   (a-1 :float)
@@ -126,7 +126,7 @@
 
 
 (cffi:defcstruct ai-material-property
-  (m-key ai-string)
+  (m-key (:struct ai-string))
   (m-semantic ai-texture-type)
   (m-index :unsigned-int)
   (m-data-length :unsigned-int)
@@ -139,7 +139,7 @@
   (value :float))
 
 (cffi:defcstruct ai-material
-  (m-properties :pointer)
+  (m-properties (:pointer (:pointer (:struct ai-material-property))))
   (m-num-properties :unsigned-int)
   (m-num-allocated :unsigned-int))
 
@@ -170,11 +170,11 @@
   (d-4 :float))
 
 (cffi:defcstruct ai-node
-  (m-name ai-string)
-  (m-transformation ai-matrix-4x-4)
-  (m-parent :pointer)
+  (m-name (:struct ai-string))
+  (m-transformation (:struct ai-matrix-4x-4))
+  (m-parent (:pointer (:struct ai-node)))
   (m-num-children :unsigned-int)
-  (m-children :pointer)
+  (m-children (:pointer (:pointer (:struct ai-node))))
   (m-num-meshes :unsigned-int)
   (m-meshes (:pointer :unsigned-int)))
 
@@ -193,10 +193,10 @@
   (m-weight :float))
 
 (cffi:defcstruct ai-bone
-  (m-name ai-string)
+  (m-name (:struct ai-string))
   (m-num-weights :unsigned-int)
-  (m-weights :pointer)
-  (m-offset-matrix ai-matrix-4x-4))
+  (m-weights (:pointer (:struct ai-vertex-weight)))
+  (m-offset-matrix (:struct ai-matrix-4x-4)))
 
 ;; fixme: probably should grovel these, aiMesh.h says they shouldn't change
 ;; though, so ignoring for now...
@@ -205,7 +205,7 @@
   (cl:defconstant +ai-max-number-of-color-sets+ 8)
   (cl:defconstant +ai-max-number-of-texturecoords+ 8))
 
-;; 3.0 unused
+;; 3.0 assimp doco says this is unused unused
 #++
 (cffi:defcstruct ai-anim-mesh
   (m-vertices :pointer)
@@ -220,18 +220,21 @@
   (m-primitive-types :unsigned-int)
   (m-num-vertices :unsigned-int)
   (m-num-faces :unsigned-int)
-  (m-vertices :pointer)
-  (m-normals :pointer)
-  (m-tangents :pointer)
-  (m-bitangents :pointer)
-  (m-colors :pointer :count #.+ai-max-number-of-color-sets+)
-  (m-texture-coords :pointer :count #.+ai-max-number-of-texturecoords+)
-  (m-num-uv-components :unsigned-int :count #.+ai-max-number-of-texturecoords+)
-  (m-faces :pointer)
+  (m-vertices (:pointer (:struct ai-vector-3d)))
+  (m-normals (:pointer (:struct ai-vector-3d)))
+  (m-tangents (:pointer (:struct ai-vector-3d)))
+  (m-bitangents (:pointer (:struct ai-vector-3d)))
+  (m-colors (:pointer (:struct ai-color-4d)) 
+            :count #.+ai-max-number-of-color-sets+)
+  (m-texture-coords (:pointer (:struct ai-vector-3d)) 
+                    :count #.+ai-max-number-of-texturecoords+)
+  (m-num-uv-components :unsigned-int
+                       :count #.+ai-max-number-of-texturecoords+)
+  (m-faces (:pointer (:struct ai-face)))
   (m-num-bones :unsigned-int)
-  (m-bones :pointer)
+  (m-bones (:pointer (:pointer (:struct ai-bone))))
   (m-material-index :unsigned-int)
-  (m-name ai-string) ;; 3.0
+  (m-name (:struct ai-string)) ;; 3.0
   (m-num-anim-meshes :unsigned-int) ;; 3.0, unused
   (m-anim-meshes :pointer)) ;; 3.0 unused
 
@@ -245,7 +248,7 @@
   (m-width :unsigned-int)
   (m-height :unsigned-int)
   (ach-format-hint :char :count 4)
-  (pc-data :pointer))
+  (pc-data (:pointer (:struct ai-texel))))
 
 (cffi:defcenum (ai-light-source-type :int)
   (:ai-light-source-undefined 0)
@@ -254,7 +257,7 @@
   (:ai-light-source-spot 3))
 
 (cffi:defcstruct ai-light
-  (m-name ai-string)
+  (m-name (:struct ai-string))
   (m-type ai-light-source-type)
   (m-position ai-vector-3d)
   (m-direction ai-vector-3d)
@@ -269,19 +272,19 @@
 
 (cffi:defcstruct ai-scene
   (m-flags :unsigned-int)
-  (m-root-node :pointer)
+  (m-root-node (:pointer (:struct ai-node)))
   (m-num-meshes :unsigned-int)
-  (m-meshes :pointer)
+  (m-meshes (:pointer (:pointer (:struct ai-mesh))))
   (m-num-materials :unsigned-int)
-  (m-materials :pointer)
+  (m-materials (:pointer (:pointer (:struct ai-material))))
   (m-num-animations :unsigned-int)
-  (m-animations :pointer)
+  (m-animations (:pointer (:pointer (:struct ai-animation))))
   (m-num-textures :unsigned-int)
-  (m-textures :pointer)
+  (m-textures (:pointer (:pointer (:struct ai-texture))))
   (m-num-lights :unsigned-int)
-  (m-lights :pointer)
+  (m-lights (:pointer (:pointer (:struct ai-light))))
   (m-num-cameras :unsigned-int)
-  (m-cameras :pointer)
+  (m-cameras (:pointer (:pointer (:struct ai-camera))))
   (m-private :pointer)) ;; 3.0
 
 #+nil
