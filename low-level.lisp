@@ -83,8 +83,8 @@
   (m-rotation-keys (:pointer (:struct ai-quat-key)))
   (m-num-scaling-keys :unsigned-int)
   (m-scaling-keys (:pointer (:struct ai-vector-key)))
-  (m-pre-state (:struct ai-anim-behaviour))
-  (m-post-state (:struct ai-anim-behaviour)))
+  (m-pre-state ai-anim-behaviour)
+  (m-post-state ai-anim-behaviour))
 
 (cffi:defcstruct ai-animation
   (m-name (:struct ai-string))
@@ -125,10 +125,10 @@
 
 (cffi:defcstruct ai-material-property
   (m-key (:struct ai-string))
-  (m-semantic (:struct ai-texture-type))
+  (m-semantic ai-texture-type)
   (m-index :unsigned-int)
   (m-data-length :unsigned-int)
-  (m-type (:struct ai-property-type-info))
+  (m-type ai-property-type-info)
   (m-data (:pointer :char)))
 
 (cffi:defcfun ("aiSetImportPropertyFloat" ai-set-import-property-float) :void
@@ -145,7 +145,7 @@
 (cffi:defcfun ("aiGetMaterialProperty" ai-get-material-property) ai-return
   (p-mat :pointer)
   (p-key :pointer)
-  (type (:struct ai-texture-type))
+  (type ai-texture-type)
   (index :unsigned-int)
   (p-prop-out :pointer))
 
@@ -256,7 +256,7 @@
 
 (cffi:defcstruct ai-light
   (m-name (:struct ai-string))
-  (m-type (:struct ai-light-source-type))
+  (m-type ai-light-source-type)
   (m-position (:struct ai-vector-3d))
   (m-direction (:struct ai-vector-3d))
   (m-attenuation-constant :float)
@@ -421,7 +421,7 @@
 (cffi::defctype ai-log-stream-callback :pointer)
 
 (cffi:defcstruct ai-log-stream
-  (callback (:struct ai-log-stream-callback))
+  (callback ai-log-stream-callback)
   (user (:pointer :char)))
 
 (cffi:defbitfield (ai-default-log-stream :int)
@@ -432,7 +432,7 @@
 
 #-old-assimp
 (cffi:defcfun ("aiGetPredefinedLogStream" ai-get-predefined-log-stream)
-    ai-log-stream
+    ai-log-stream ;;[TODO] the fuck?
   (p-streams ai-default-log-stream)
   (file :string))
 
@@ -476,9 +476,9 @@
 (cffi::defctype ai-user-data (:pointer :char))
 
 (cffi:defcstruct ai-file-io
-    (open-proc (:struct ai-file-open-proc))
-  (close-proc (:struct ai-file-close-proc))
-  (user-data (:struct ai-user-data)))
+  (open-proc ai-file-open-proc)
+  (close-proc ai-file-close-proc)
+  (user-data ai-user-data))
 
 (cffi:defcenum (ai-texture-mapping :int)
   (:ai-texture-mapping-uv 0)
@@ -521,13 +521,13 @@
 (cffi::defctype ai-file-flush-proc :pointer)
 
 (cffi:defcstruct ai-file
-  (read-proc (:struct ai-file-read-proc))
-  (write-proc (:struct ai-file-write-proc))
-  (tell-proc (:struct ai-file-tell-proc))
-  (file-size-proc (:struct ai-file-tell-proc))
-  (seek-proc (:struct ai-file-seek))
-  (flush-proc (:struct ai-file-flush-proc))
-  (user-data (:struct ai-user-data)))
+  (read-proc  ai-file-read-proc)
+  (write-proc  ai-file-write-proc)
+  (tell-proc  ai-file-tell-proc)
+  (file-size-proc  ai-file-tell-proc)
+  (seek-proc  ai-file-seek)
+  (flush-proc ai-file-flush-proc)
+  (user-data ai-user-data))
 
 (cffi:defcfun ("aiGetErrorString" ai-get-error-string) :pointer)
 

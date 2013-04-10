@@ -323,16 +323,16 @@
      'primitive-types %ai:m-primitive-types
      'vertices (translate-ai-array translate-ai-vector3d %ai:m-num-vertices
                                    %ai:m-vertices
-                                   :type %ai:ai-vector-3d :indirect nil)
+                                   :type (:struct %ai:ai-vector-3d) :indirect nil)
      'normals (translate-ai-array translate-ai-vector3d %ai:m-num-vertices
                                   %ai:m-normals
-                                  :type %ai:ai-vector-3d :indirect nil)
+                                  :type (:struct %ai:ai-vector-3d) :indirect nil)
      'tangents (translate-ai-array translate-ai-vector3d %ai:m-num-vertices
                                    %ai:m-tangents
-                                   :type %ai:ai-vector-3d :indirect nil)
+                                   :type (:struct %ai:ai-vector-3d) :indirect nil)
      'bitangents (translate-ai-array translate-ai-vector3d %ai:m-num-vertices
                                      %ai:m-bitangents
-                                     :type %ai:ai-vector-3d :indirect nil)
+                                     :type (:struct %ai:ai-vector-3d) :indirect nil)
      'colors (apply 'vector
                     (sequence-right-trim '(nil)
                                          (loop for i below %ai::+ai-max-number-of-color-sets+
@@ -350,7 +350,7 @@
                                     collect (translate-ai-array translate-ai-vector3d
                                                                 %ai:m-num-vertices
                                                                 tc
-                                                                :type %ai:ai-vector-3d
+                                                                :type (:struct %ai:ai-vector-3d)
                                                                 :indirect nil))))
      'components-per-texture-coord
      (translate-ai-array translate-uint %ai::+ai-max-number-of-texturecoords+
@@ -358,7 +358,7 @@
                          :type :unsigned-int :indirect nil)
      'faces (translate-ai-array translate-ai-face %ai:m-num-faces
                                 %ai:m-faces
-                                :type %ai:ai-face :indirect nil)
+                                :type (:struct %ai:ai-face) :indirect nil)
      'bones (translate-ai-array translate-ai-bone %ai:m-num-bones
                                 %ai:m-bones)
      'material-index %ai:m-material-index)))
