@@ -1,4 +1,4 @@
-(in-package #:classimp)
+(in-package :classimp)
 
 (defmacro with-foreign-slots* ((vars ptr type) &body body)
   "Create local symbol macros for each var in VARS to reference

@@ -164,12 +164,14 @@
       ""))
 
 (defun translate-ai-string (str)
-  (with-foreign-slots* ((%ai:length %ai:data) str %ai:ai-string)
+  (with-foreign-slots* ((%ai:length (:pointer %ai:data)) str 
+                        (:struct %ai:ai-string))
     (decode-string %ai:data %ai:length)))
 
 ;; material properties use u32 for length instead of size_t
 (defun translate-ai-string32 (str)
-  (with-foreign-slots* ((%ai:length %ai:data) str %ai::ai-string32)
+  (with-foreign-slots* ((%ai:length (:pointer %ai:data)) str 
+                        (:struct %ai::ai-string32))
     (decode-string %ai:data %ai:length)))
 
 (defun translate-ai-matrix-4x4 (m)
@@ -180,11 +182,12 @@
                    collect (cffi:mem-aref m :float i)))))
 
 (defun translate-ai-node (node)
-  (with-foreign-slots* ((%ai:m-name
-                         %ai:m-transformation %ai:m-parent
+  (print (cffi:foreign-slot-value node '(:struct %ai:ai-node) '%ai:m-num-meshes))
+  (with-foreign-slots* (((:pointer %ai:m-name)
+                         (:pointer %ai:m-transformation) %ai:m-parent
                          %ai:m-num-children %ai:m-children
                          %ai:m-num-meshes %ai:m-meshes)
-                        node %ai:ai-node)
+                        node (:struct %ai:ai-node))
     (when *translate-verbose*
       (format t "load node ~s, ~s children ~s meshes~%"
               (translate-ai-string %ai:m-name)
@@ -266,8 +269,8 @@
   (cffi:mem-aref p :unsigned-int))
 
 (defun translate-ai-face (f)
-  (with-foreign-slots* ((%ai:m-num-indices %ai:m-indices)
-                        f %ai:ai-face)
+  (with-foreign-slots* ((%ai:m-num-indices %ai:m-indices) f
+                        (:struct %ai:ai-face))
     (translate-ai-array translate-uint %ai:m-num-indices %ai:m-indices
                         :type :unsigned-int :indirect nil)))
 
@@ -276,16 +279,14 @@
     (subseq sequence 0 (if pos (1+ pos) 0))))
 
 (defun translate-ai-vertex-weight (w)
-  (with-foreign-slots* ((%ai:m-vertex-id
-                         %ai:m-weight) w %ai:ai-vertex-weight)
+  (with-foreign-slots* ((%ai:m-vertex-id %ai:m-weight) w
+                        (:struct %ai:ai-vertex-weight))
     (make-instance 'vertex-weight 'id %ai:m-vertex-id 'weight %ai:m-weight)))
 
 (defun translate-ai-bone (b)
-  (with-foreign-slots* ((%ai:m-name
-                         %ai:m-num-weights ; uint
-                         %ai:m-weights ; *
-                         %ai:m-offset-matrix ; ai-matrix-4x-4
-                         ) b %ai:ai-bone)
+  (with-foreign-slots* (((:pointer %ai:m-name) %ai:m-num-weights
+                         %ai:m-weights (:pointer %ai:m-offset-matrix))
+                        b (:struct %ai:ai-bone))
     (when *translate-verbose*
       (format t "load bone ~s, ~s weights~%"
               (translate-ai-string %ai:m-name)
@@ -314,7 +315,7 @@
                          %ai:m-num-bones
                          %ai:m-bones
                          %ai:m-material-index)
-                        m %ai:ai-mesh)
+                        m (:struct %ai:ai-mesh))
     (when *translate-verbose*
       (format t "load mesh~%"))
     (make-instance
@@ -365,8 +366,8 @@
 (defparameter *translate-anim-node-ticks-per-second* 0.0)
 
 (defun translate-ai-vector-key (k)
-  (with-foreign-slots* ((%ai:m-time
-                         %ai:m-value) k %ai:ai-vector-key)
+  (with-foreign-slots* ((%ai:m-time (:pointer %ai:m-value)) k
+                        (:struct %ai:ai-vector-key))
     (make-instance 'vector-key
                    'time (if (or (not *loader-translate-times*)
                                  (zerop *translate-anim-node-ticks-per-second*))
@@ -376,8 +377,8 @@
                    'value (translate-ai-vector3d %ai:m-value))))
 
 (defun translate-ai-quaternion-key (k)
-  (with-foreign-slots* ((%ai:m-time
-                         %ai:m-value) k %ai:ai-quat-key)
+  (with-foreign-slots* ((%ai:m-time (:pointer %ai:m-value)) k
+                        (:struct %ai:ai-quat-key))
     (make-instance 'vector-key
                    'time (if (or (not *loader-translate-times*)
                                  (zerop *translate-anim-node-ticks-per-second*))
@@ -387,15 +388,16 @@
                    'value (translate-ai-vector4 %ai:m-value))))
 
 (defun translate-ai-anim-node (a)
-  (with-foreign-slots*  ((%ai:m-node-name
-                          %ai:m-num-position-keys
-                          %ai:m-position-keys
-                          %ai:m-num-rotation-keys
-                          %ai:m-rotation-keys
-                          %ai:m-num-scaling-keys
-                          %ai:m-scaling-keys
-                          %ai:m-pre-state
-                          %ai:m-post-state) a %ai:ai-node-anim)
+  (with-foreign-slots* (((:pointer %ai:m-node-name)
+                         %ai:m-num-position-keys
+                         %ai:m-position-keys
+                         %ai:m-num-rotation-keys
+                         %ai:m-rotation-keys
+                         %ai:m-num-scaling-keys
+                         %ai:m-scaling-keys
+                         (:pointer %ai:m-pre-state)
+                         (:pointer %ai:m-post-state)) a
+                        (:struct %ai:ai-node-anim))
     (when *translate-verbose*
       (format t "load anim keys for node ~s, ~s / ~s / ~s keys~%"
               (translate-ai-string %ai:m-node-name)
@@ -419,11 +421,10 @@
      'post-state %ai:m-post-state)))
 
 (defun translate-ai-animation (a)
-  (with-foreign-slots* ((%ai:m-name
-                         %ai:m-duration
-                         %ai:m-ticks-per-second
-                         %ai:m-num-channels
-                         %ai:m-channels) a %ai:ai-animation)
+  (with-foreign-slots* (((:pointer %ai:m-name) %ai:m-duration
+                         %ai:m-ticks-per-second %ai:m-num-channels
+                         %ai:m-channels) a
+                        (:struct %ai:ai-animation))
     (when *translate-verbose*
       (format t "load animation ~s, ~s channels~%"
               (translate-ai-string %ai:m-name)
@@ -451,13 +452,12 @@
        'index index))))
 
 (defun translate-generic-material-property (key p)
-  (with-foreign-slots* ((
-                         %ai:m-semantic
+  (with-foreign-slots* ((%ai:m-semantic
                          %ai:m-index
                          %ai:m-data-length
                          %ai:m-type
                          %ai:m-data)
-                        p %ai:ai-material-property)
+                        p (:struct %ai:ai-material-property))
     (flet ((data-array (lisp-type cffi-type)
              (if (= %ai:m-data-length 4)
                  (cffi:mem-aref %ai:m-data cffi-type)
@@ -481,21 +481,22 @@
         (list key %ai:m-semantic %ai:m-index data)))))
 
 (defun translate-ai-uv-transform (x)
-  (with-foreign-slots* ((%ai:m-translation %ai:m-scaling %ai:m-rotation)
-                        x %ai:ai-uv-transform)
+  (with-foreign-slots* (((:pointer %ai:m-translation) (:pointer %ai:m-scaling)
+                         %ai:m-rotation) x
+                        (:struct %ai:ai-uv-transform))
     ;; rotation is radians, ccw around 0.5,0.5 in UV space, default 0
     (list (translate-ai-vector2 %ai:m-translation)
           (translate-ai-vector2 %ai:m-scaling)
           %ai:m-rotation)))
 
 (defun translate-ai-material-property (p)
-  (with-foreign-slots* ((%ai:m-key
+  (with-foreign-slots* (((:pointer %ai:m-key)
                          %ai:m-semantic
                          %ai:m-index
                          %ai:m-data-length
                          %ai:m-type
                          %ai:m-data)
-                        p %ai:ai-material-property)
+                        p (:struct %ai:ai-material-property))
     (let ((key (translate-ai-string %ai:m-key)))
       (labels ((k= (s) (string= key s))
                (single-value (type)
@@ -541,7 +542,7 @@
 
 (defun translate-ai-material (m)
   (with-foreign-slots* ((%ai:m-num-properties %ai:m-properties)
-                        m %ai:ai-material)
+                        m (:struct %ai:ai-material))
     (format t "loading material, ~s properties~%" %ai:m-num-properties)
     ;; keys are theoretically case insensitive, not sure if they ever
     ;; vary though, since there is a limited set or predefined values
@@ -563,9 +564,9 @@
 (defun translate-ai-texture (tx)
   (with-foreign-slots* ((%ai:m-width
                          %ai:m-height
-                         %ai:ach-format-hint
+                         (:pointer %ai:ach-format-hint)
                          %ai:pc-data)
-                        tx %ai:ai-texture)
+                        tx (:struct %ai:ai-texture))
     (when *translate-verbose*
       (format t "loaded embedded texture ~s x ~s~%" %ai:m-width %ai:m-height))
     (if (zerop %ai:m-width)
@@ -589,19 +590,19 @@
                  finally (return a))))))
 
 (defun translate-ai-light (l)
-  (with-foreign-slots* ((%ai:m-name
-                         %ai:m-type
-                         %ai:m-position
-                         %ai:m-direction
+  (with-foreign-slots* (((:pointer %ai:m-name)
+                         (:pointer %ai:m-type)
+                         (:pointer %ai:m-position)
+                         (:pointer %ai:m-direction)
                          %ai:m-attenuation-constant
                          %ai:m-attenuation-linear
                          %ai:m-attenuation-quadratic
-                         %ai:m-color-diffuse
-                         %ai:m-color-specular
-                         %ai:m-color-ambient
+                         (:pointer %ai:m-color-diffuse)
+                         (:pointer %ai:m-color-specular)
+                         (:pointer %ai:m-color-ambient)
                          %ai:m-angle-inner-cone
                          %ai:m-angle-outer-cone)
-                        l %ai:ai-light)
+                        l (:struct %ai:ai-light))
     (format t "translating light = ")
     (print (ecase %ai:m-type
              (:ai-light-source-directional
@@ -632,15 +633,15 @@
                     :outer-angle %ai:m-angle-outer-cone))))))
 
 (defun translate-ai-camera (c)
-  (with-foreign-slots* ((%ai:m-name
-                         %ai:m-position
-                         %ai:m-up
-                         %ai:m-look-at
+  (with-foreign-slots* (((:pointer %ai:m-name)
+                         (:pointer %ai:m-position)
+                         (:pointer %ai:m-up)
+                         (:pointer %ai:m-look-at)
                          %ai:m-horizontal-fov
                          %ai:m-clip-plane-near
                          %ai:m-clip-plane-far
                          %ai:m-aspect)
-                        c %ai:ai-camera)
+                        c (:struct %ai:ai-camera))
     (when *translate-verbose*
       (format t "translate camera ~s~%" (translate-ai-string %ai:m-name)))
     (list (translate-ai-string %ai:m-name)
@@ -653,15 +654,14 @@
           :aspect %ai:m-aspect)))
 
 (defun translate-ai-scene (scene)
-  (with-foreign-slots* ((%ai:m-flags
-                         %ai:m-root-node
-                         %ai:m-num-meshes %ai:m-meshes
-                         %ai:m-num-materials %ai:m-materials
-                         %ai:m-num-animations %ai:m-animations
-                         %ai:m-num-textures %ai:m-textures
-                         %ai:m-num-lights %ai:m-lights
-                         %ai:m-num-cameras %ai:m-cameras)
-                        scene %ai:ai-scene)
+  (with-foreign-slots* ((%ai:m-flags %ai:m-root-node
+                                     %ai:m-num-meshes %ai:m-meshes
+                                     %ai:m-num-materials %ai:m-materials
+                                     %ai:m-num-animations %ai:m-animations
+                                     %ai:m-num-textures %ai:m-textures
+                                     %ai:m-num-lights %ai:m-lights
+                                     %ai:m-num-cameras %ai:m-cameras)
+                        scene (:struct %ai:ai-scene))
     (make-instance
      'scene
      'flags %ai:m-flags

@@ -123,8 +123,6 @@
   (:ai-texture-type-reflection 11)
   (:ai-texture-type-unknown 12))
 
-
-
 (cffi:defcstruct ai-material-property
   (m-key (:struct ai-string))
   (m-semantic ai-texture-type)
@@ -172,9 +170,9 @@
 (cffi:defcstruct ai-node
   (m-name (:struct ai-string))
   (m-transformation (:struct ai-matrix-4x-4))
-  (m-parent (:pointer (:struct ai-node)))
+  (m-parent :pointer)
   (m-num-children :unsigned-int)
-  (m-children (:pointer (:pointer (:struct ai-node))))
+  (m-children :pointer)
   (m-num-meshes :unsigned-int)
   (m-meshes (:pointer :unsigned-int)))
 
