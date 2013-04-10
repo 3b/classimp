@@ -96,7 +96,7 @@
    (material-index :accessor material-index :initarg material-index)
    )
   
-)
+  )
 
 ;; fixme: should probably use the enum/bitfields instead of hard coding #s here
 (defmethod mesh-has-points ((mesh mesh))
@@ -164,12 +164,12 @@
       ""))
 
 (defun translate-ai-string (str)
-  (cffi:with-foreign-slots ((%ai:length %ai:data) str %ai:ai-string)
+  (with-foreign-slots* ((%ai:length %ai:data) str %ai:ai-string)
     (decode-string %ai:data %ai:length)))
 
 ;; material properties use u32 for length instead of size_t
 (defun translate-ai-string32 (str)
-  (cffi:with-foreign-slots ((%ai:length %ai:data) str %ai::ai-string32)
+  (with-foreign-slots* ((%ai:length %ai:data) str %ai::ai-string32)
     (decode-string %ai:data %ai:length)))
 
 (defun translate-ai-matrix-4x4 (m)
@@ -180,11 +180,11 @@
                    collect (cffi:mem-aref m :float i)))))
 
 (defun translate-ai-node (node)
-  (cffi:with-foreign-slots ((%ai:m-name
-                             %ai:m-transformation %ai:m-parent
-                             %ai:m-num-children %ai:m-children
-                             %ai:m-num-meshes %ai:m-meshes)
-                            node %ai:ai-node)
+  (with-foreign-slots* ((%ai:m-name
+                         %ai:m-transformation %ai:m-parent
+                         %ai:m-num-children %ai:m-children
+                         %ai:m-num-meshes %ai:m-meshes)
+                        node %ai:ai-node)
     (when *translate-verbose*
       (format t "load node ~s, ~s children ~s meshes~%"
               (translate-ai-string %ai:m-name)
@@ -217,23 +217,23 @@
 
 (defmacro translate-ai-array (translator count source
                               &key (type :pointer) (indirect t)
-                              )
+                                )
   ;; fixme: possibly should add option to treat null pointers as error?
   `(progn
      #++(format t "translating array ~s ~s ~s~%" ',translator ',count ',source)
      ,(alexandria:once-only (count source)
-      `(when (not (cffi:null-pointer-p ,source))
-         #++(format t " ==  ~s ~s ~s~%" ',translator ',count ',source)
-         (make-array
-          ,count
-          :initial-contents
-          (loop for i below ,count
-             collect
-               ,(if indirect
-                    `(,translator (cffi:mem-aref ,source ,type i))
-                    `(,translator (cffi:inc-pointer
-                                   ,source
-                                   (* (cffi:foreign-type-size ',type) i))))))))))
+                            `(when (not (cffi:null-pointer-p ,source))
+                               #++(format t " ==  ~s ~s ~s~%" ',translator ',count ',source)
+                               (make-array
+                                ,count
+                                :initial-contents
+                                (loop for i below ,count
+                                   collect
+                                     ,(if indirect
+                                          `(,translator (cffi:mem-aref ,source ,type i))
+                                          `(,translator (cffi:inc-pointer
+                                                         ,source
+                                                         (* (cffi:foreign-type-size ',type) i))))))))))
 
 
 ;; possibly should just combine these into a generic 'struct/array with
@@ -266,8 +266,8 @@
   (cffi:mem-aref p :unsigned-int))
 
 (defun translate-ai-face (f)
-  (cffi:with-foreign-slots ((%ai:m-num-indices %ai:m-indices)
-                            f %ai:ai-face)
+  (with-foreign-slots* ((%ai:m-num-indices %ai:m-indices)
+                        f %ai:ai-face)
     (translate-ai-array translate-uint %ai:m-num-indices %ai:m-indices
                         :type :unsigned-int :indirect nil)))
 
@@ -276,16 +276,16 @@
     (subseq sequence 0 (if pos (1+ pos) 0))))
 
 (defun translate-ai-vertex-weight (w)
-  (cffi:with-foreign-slots ((%ai:m-vertex-id
-                             %ai:m-weight) w %ai:ai-vertex-weight)
+  (with-foreign-slots* ((%ai:m-vertex-id
+                         %ai:m-weight) w %ai:ai-vertex-weight)
     (make-instance 'vertex-weight 'id %ai:m-vertex-id 'weight %ai:m-weight)))
 
 (defun translate-ai-bone (b)
-  (cffi:with-foreign-slots ((%ai:m-name
-                             %ai:m-num-weights ; uint
-                             %ai:m-weights ; *
-                             %ai:m-offset-matrix ; ai-matrix-4x-4
-                             ) b %ai:ai-bone)
+  (with-foreign-slots* ((%ai:m-name
+                         %ai:m-num-weights ; uint
+                         %ai:m-weights ; *
+                         %ai:m-offset-matrix ; ai-matrix-4x-4
+                         ) b %ai:ai-bone)
     (when *translate-verbose*
       (format t "load bone ~s, ~s weights~%"
               (translate-ai-string %ai:m-name)
@@ -300,21 +300,21 @@
 
 
 (defun translate-ai-mesh (m)
-  (cffi:with-foreign-slots ((%ai:m-primitive-types
-                             %ai:m-num-vertices
-                             %ai:m-num-faces
-                             %ai:m-vertices
-                             %ai:m-normals
-                             %ai:m-tangents
-                             %ai:m-bitangents
-                             %ai:m-colors
-                             %ai:m-texture-coords
-                             %ai:m-num-uv-components
-                             %ai:m-faces
-                             %ai:m-num-bones
-                             %ai:m-bones
-                             %ai:m-material-index)
-                            m %ai:ai-mesh)
+  (with-foreign-slots* ((%ai:m-primitive-types
+                         %ai:m-num-vertices
+                         %ai:m-num-faces
+                         %ai:m-vertices
+                         %ai:m-normals
+                         %ai:m-tangents
+                         %ai:m-bitangents
+                         %ai:m-colors
+                         %ai:m-texture-coords
+                         %ai:m-num-uv-components
+                         %ai:m-faces
+                         %ai:m-num-bones
+                         %ai:m-bones
+                         %ai:m-material-index)
+                        m %ai:ai-mesh)
     (when *translate-verbose*
       (format t "load mesh~%"))
     (make-instance
@@ -334,23 +334,23 @@
                                      :type %ai:ai-vector-3d :indirect nil)
      'colors (apply 'vector
                     (sequence-right-trim '(nil)
-                     (loop for i below %ai::+ai-max-number-of-color-sets+
-                        for c = (cffi:mem-aref %ai:m-colors :pointer i)
-                        collect (translate-ai-array translate-ai-color4f
-                                                    %ai:m-num-vertices
-                                                    c
-                                                    :type %ai:ai-color-4d
-                                                    :indirect nil))))
+                                         (loop for i below %ai::+ai-max-number-of-color-sets+
+                                            for c = (cffi:mem-aref %ai:m-colors :pointer i)
+                                            collect (translate-ai-array translate-ai-color4f
+                                                                        %ai:m-num-vertices
+                                                                        c
+                                                                        :type %ai:ai-color-4d
+                                                                        :indirect nil))))
      'texture-coords
      (apply 'vector
             (sequence-right-trim '(nil)
-             (loop for i below %ai::+ai-max-number-of-texturecoords+
-                for tc = (cffi:mem-aref %ai:m-texture-coords :pointer i)
-                collect (translate-ai-array translate-ai-vector3d
-                                            %ai:m-num-vertices
-                                            tc
-                                            :type %ai:ai-vector-3d
-                                            :indirect nil))))
+                                 (loop for i below %ai::+ai-max-number-of-texturecoords+
+                                    for tc = (cffi:mem-aref %ai:m-texture-coords :pointer i)
+                                    collect (translate-ai-array translate-ai-vector3d
+                                                                %ai:m-num-vertices
+                                                                tc
+                                                                :type %ai:ai-vector-3d
+                                                                :indirect nil))))
      'components-per-texture-coord
      (translate-ai-array translate-uint %ai::+ai-max-number-of-texturecoords+
                          %ai:m-num-uv-components
@@ -365,8 +365,8 @@
 (defparameter *translate-anim-node-ticks-per-second* 0.0)
 
 (defun translate-ai-vector-key (k)
-  (cffi:with-foreign-slots ((%ai:m-time
-                             %ai:m-value) k %ai:ai-vector-key)
+  (with-foreign-slots* ((%ai:m-time
+                         %ai:m-value) k %ai:ai-vector-key)
     (make-instance 'vector-key
                    'time (if (or (not *loader-translate-times*)
                                  (zerop *translate-anim-node-ticks-per-second*))
@@ -376,8 +376,8 @@
                    'value (translate-ai-vector3d %ai:m-value))))
 
 (defun translate-ai-quaternion-key (k)
-  (cffi:with-foreign-slots ((%ai:m-time
-                             %ai:m-value) k %ai:ai-quat-key)
+  (with-foreign-slots* ((%ai:m-time
+                         %ai:m-value) k %ai:ai-quat-key)
     (make-instance 'vector-key
                    'time (if (or (not *loader-translate-times*)
                                  (zerop *translate-anim-node-ticks-per-second*))
@@ -387,19 +387,19 @@
                    'value (translate-ai-vector4 %ai:m-value))))
 
 (defun translate-ai-anim-node (a)
-  (cffi:with-foreign-slots  ((%ai:m-node-name
-                              %ai:m-num-position-keys
-                              %ai:m-position-keys
-                              %ai:m-num-rotation-keys
-                              %ai:m-rotation-keys
-                              %ai:m-num-scaling-keys
-                              %ai:m-scaling-keys
-                              %ai:m-pre-state
-                              %ai:m-post-state) a %ai:ai-node-anim)
+  (with-foreign-slots*  ((%ai:m-node-name
+                          %ai:m-num-position-keys
+                          %ai:m-position-keys
+                          %ai:m-num-rotation-keys
+                          %ai:m-rotation-keys
+                          %ai:m-num-scaling-keys
+                          %ai:m-scaling-keys
+                          %ai:m-pre-state
+                          %ai:m-post-state) a %ai:ai-node-anim)
     (when *translate-verbose*
       (format t "load anim keys for node ~s, ~s / ~s / ~s keys~%"
-             (translate-ai-string %ai:m-node-name)
-             %ai:m-num-position-keys %ai:m-num-rotation-keys %ai:m-num-scaling-keys))
+              (translate-ai-string %ai:m-node-name)
+              %ai:m-num-position-keys %ai:m-num-rotation-keys %ai:m-num-scaling-keys))
     (make-instance
      'node-animation
      'node-name (translate-ai-string %ai:m-node-name)
@@ -419,15 +419,15 @@
      'post-state %ai:m-post-state)))
 
 (defun translate-ai-animation (a)
-  (cffi:with-foreign-slots ((%ai:m-name
-                             %ai:m-duration
-                             %ai:m-ticks-per-second
-                             %ai:m-num-channels
-                             %ai:m-channels) a %ai:ai-animation)
+  (with-foreign-slots* ((%ai:m-name
+                         %ai:m-duration
+                         %ai:m-ticks-per-second
+                         %ai:m-num-channels
+                         %ai:m-channels) a %ai:ai-animation)
     (when *translate-verbose*
       (format t "load animation ~s, ~s channels~%"
-             (translate-ai-string %ai:m-name)
-             %ai:m-num-channels))
+              (translate-ai-string %ai:m-name)
+              %ai:m-num-channels))
     (let* ((*translate-anim-node-ticks-per-second*
             (if (zerop %ai:m-ticks-per-second)
                 *loader-default-animation-ticks-per-second*
@@ -451,13 +451,13 @@
        'index index))))
 
 (defun translate-generic-material-property (key p)
-  (cffi:with-foreign-slots ((
-                             %ai:m-semantic
-                             %ai:m-index
-                             %ai:m-data-length
-                             %ai:m-type
-                             %ai:m-data)
-                            p %ai:ai-material-property)
+  (with-foreign-slots* ((
+                         %ai:m-semantic
+                         %ai:m-index
+                         %ai:m-data-length
+                         %ai:m-type
+                         %ai:m-data)
+                        p %ai:ai-material-property)
     (flet ((data-array (lisp-type cffi-type)
              (if (= %ai:m-data-length 4)
                  (cffi:mem-aref %ai:m-data cffi-type)
@@ -481,21 +481,21 @@
         (list key %ai:m-semantic %ai:m-index data)))))
 
 (defun translate-ai-uv-transform (x)
-  (cffi:with-foreign-slots ((%ai:m-translation %ai:m-scaling %ai:m-rotation)
-                            x %ai:ai-uv-transform)
+  (with-foreign-slots* ((%ai:m-translation %ai:m-scaling %ai:m-rotation)
+                        x %ai:ai-uv-transform)
     ;; rotation is radians, ccw around 0.5,0.5 in UV space, default 0
     (list (translate-ai-vector2 %ai:m-translation)
           (translate-ai-vector2 %ai:m-scaling)
           %ai:m-rotation)))
 
 (defun translate-ai-material-property (p)
-  (cffi:with-foreign-slots ((%ai:m-key
-                             %ai:m-semantic
-                             %ai:m-index
-                             %ai:m-data-length
-                             %ai:m-type
-                             %ai:m-data)
-                            p %ai:ai-material-property)
+  (with-foreign-slots* ((%ai:m-key
+                         %ai:m-semantic
+                         %ai:m-index
+                         %ai:m-data-length
+                         %ai:m-type
+                         %ai:m-data)
+                        p %ai:ai-material-property)
     (let ((key (translate-ai-string %ai:m-key)))
       (labels ((k= (s) (string= key s))
                (single-value (type)
@@ -540,8 +540,8 @@
           (t (translate-generic-material-property key p)))))))
 
 (defun translate-ai-material (m)
-  (cffi:with-foreign-slots ((%ai:m-num-properties %ai:m-properties)
-                            m %ai:ai-material)
+  (with-foreign-slots* ((%ai:m-num-properties %ai:m-properties)
+                        m %ai:ai-material)
     (format t "loading material, ~s properties~%" %ai:m-num-properties)
     ;; keys are theoretically case insensitive, not sure if they ever
     ;; vary though, since there is a limited set or predefined values
@@ -561,11 +561,11 @@
                       (return hash)))))
 
 (defun translate-ai-texture (tx)
-  (cffi:with-foreign-slots ((%ai:m-width
-                             %ai:m-height
-                             %ai:ach-format-hint
-                             %ai:pc-data)
-                            tx %ai:ai-texture)
+  (with-foreign-slots* ((%ai:m-width
+                         %ai:m-height
+                         %ai:ach-format-hint
+                         %ai:pc-data)
+                        tx %ai:ai-texture)
     (when *translate-verbose*
       (format t "loaded embedded texture ~s x ~s~%" %ai:m-width %ai:m-height))
     (if (zerop %ai:m-width)
@@ -585,62 +585,62 @@
                                          :initial-element 255)
                  for i below (* %ai:m-width %ai:m-height 4)
                  do (setf (aref a i)
-                                (cffi:mem-aref %ai:pc-data :unsigned-char i))
+                          (cffi:mem-aref %ai:pc-data :unsigned-char i))
                  finally (return a))))))
 
 (defun translate-ai-light (l)
-  (cffi:with-foreign-slots ((%ai:m-name
-                             %ai:m-type
-                             %ai:m-position
-                             %ai:m-direction
-                             %ai:m-attenuation-constant
-                             %ai:m-attenuation-linear
-                             %ai:m-attenuation-quadratic
-                             %ai:m-color-diffuse
-                             %ai:m-color-specular
-                             %ai:m-color-ambient
-                             %ai:m-angle-inner-cone
-                             %ai:m-angle-outer-cone)
-                            l %ai:ai-light)
+  (with-foreign-slots* ((%ai:m-name
+                         %ai:m-type
+                         %ai:m-position
+                         %ai:m-direction
+                         %ai:m-attenuation-constant
+                         %ai:m-attenuation-linear
+                         %ai:m-attenuation-quadratic
+                         %ai:m-color-diffuse
+                         %ai:m-color-specular
+                         %ai:m-color-ambient
+                         %ai:m-angle-inner-cone
+                         %ai:m-angle-outer-cone)
+                        l %ai:ai-light)
     (format t "translating light = ")
     (print (ecase %ai:m-type
-       (:ai-light-source-directional
-        (list %ai:m-type
-              :name (translate-ai-string %ai:m-name)
-              :direction (translate-ai-vector3d %ai:m-direction)
-              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-              :specular (translate-ai-vector3d %ai:m-color-specular)
-              :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+             (:ai-light-source-directional
+              (list %ai:m-type
+                    :name (translate-ai-string %ai:m-name)
+                    :direction (translate-ai-vector3d %ai:m-direction)
+                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+                    :specular (translate-ai-vector3d %ai:m-color-specular)
+                    :ambient (translate-ai-vector3d %ai:m-color-ambient)))
 
-       (:ai-light-source-point
-        (list %ai:m-type
-              :name (translate-ai-string %ai:m-name)
-              :position (translate-ai-vector3d %ai:m-position)
-              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-              :specular (translate-ai-vector3d %ai:m-color-specular)
-              :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+             (:ai-light-source-point
+              (list %ai:m-type
+                    :name (translate-ai-string %ai:m-name)
+                    :position (translate-ai-vector3d %ai:m-position)
+                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+                    :specular (translate-ai-vector3d %ai:m-color-specular)
+                    :ambient (translate-ai-vector3d %ai:m-color-ambient)))
 
-       (:ai-light-source-spot
-        (list %ai:m-type
-              :name (translate-ai-string %ai:m-name)
-              :position (translate-ai-vector3d %ai:m-position)
-              :direction (translate-ai-vector3d %ai:m-direction)
-              :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-              :specular (translate-ai-vector3d %ai:m-color-specular)
-              :ambient (translate-ai-vector3d %ai:m-color-ambient)
-              :inner-angle %ai:m-angle-inner-cone
-              :outer-angle %ai:m-angle-outer-cone))))))
+             (:ai-light-source-spot
+              (list %ai:m-type
+                    :name (translate-ai-string %ai:m-name)
+                    :position (translate-ai-vector3d %ai:m-position)
+                    :direction (translate-ai-vector3d %ai:m-direction)
+                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+                    :specular (translate-ai-vector3d %ai:m-color-specular)
+                    :ambient (translate-ai-vector3d %ai:m-color-ambient)
+                    :inner-angle %ai:m-angle-inner-cone
+                    :outer-angle %ai:m-angle-outer-cone))))))
 
 (defun translate-ai-camera (c)
-  (cffi:with-foreign-slots ((%ai:m-name
-                             %ai:m-position
-                             %ai:m-up
-                             %ai:m-look-at
-                             %ai:m-horizontal-fov
-                             %ai:m-clip-plane-near
-                             %ai:m-clip-plane-far
-                             %ai:m-aspect)
-                            c %ai:ai-camera)
+  (with-foreign-slots* ((%ai:m-name
+                         %ai:m-position
+                         %ai:m-up
+                         %ai:m-look-at
+                         %ai:m-horizontal-fov
+                         %ai:m-clip-plane-near
+                         %ai:m-clip-plane-far
+                         %ai:m-aspect)
+                        c %ai:ai-camera)
     (when *translate-verbose*
       (format t "translate camera ~s~%" (translate-ai-string %ai:m-name)))
     (list (translate-ai-string %ai:m-name)
@@ -653,15 +653,15 @@
           :aspect %ai:m-aspect)))
 
 (defun translate-ai-scene (scene)
-  (cffi:with-foreign-slots ((%ai:m-flags
-                             %ai:m-root-node
-                             %ai:m-num-meshes %ai:m-meshes
-                             %ai:m-num-materials %ai:m-materials
-                             %ai:m-num-animations %ai:m-animations
-                             %ai:m-num-textures %ai:m-textures
-                             %ai:m-num-lights %ai:m-lights
-                             %ai:m-num-cameras %ai:m-cameras)
-                            scene %ai:ai-scene)
+  (with-foreign-slots* ((%ai:m-flags
+                         %ai:m-root-node
+                         %ai:m-num-meshes %ai:m-meshes
+                         %ai:m-num-materials %ai:m-materials
+                         %ai:m-num-animations %ai:m-animations
+                         %ai:m-num-textures %ai:m-textures
+                         %ai:m-num-lights %ai:m-lights
+                         %ai:m-num-cameras %ai:m-cameras)
+                        scene %ai:ai-scene)
     (make-instance
      'scene
      'flags %ai:m-flags
@@ -669,11 +669,11 @@
      'meshes (translate-ai-array translate-ai-mesh
                                  %ai:m-num-meshes %ai:m-meshes)
      'materials (translate-ai-array translate-ai-material
-                                     %ai:m-num-materials %ai:m-materials)
+                                    %ai:m-num-materials %ai:m-materials)
      'animations (translate-ai-array translate-ai-animation
                                      %ai:m-num-animations %ai:m-animations)
      'textures (translate-ai-array translate-ai-texture
-                                    %ai:m-num-textures %ai:m-textures)
+                                   %ai:m-num-textures %ai:m-textures)
      'lights (translate-ai-array translate-ai-light
                                  %ai:m-num-lights %ai:m-lights)
      'cameras (translate-ai-array translate-ai-camera
@@ -692,20 +692,20 @@
         (*loader-translate-times* (not raw-times)))
     (prog1
         (unwind-protect
-          (progn
-            (format t "  ai-import-file ~s~%" filename)
-            (setf raw-scene
-                  (without-fp-traps
-                    (%ai:ai-import-file
-                     (namestring filename)
-                     (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
-                                                  processing-flags))))
-            (unless (cffi:null-pointer-p raw-scene)
-              (format t "  translate-scene~%")
-              (translate-ai-scene raw-scene)))
-       (when raw-scene
-         (format t "  ai-release-import ~s~%" filename)
-         (%ai:ai-release-import raw-scene)))
+             (progn
+               (format t "  ai-import-file ~s~%" filename)
+               (setf raw-scene
+                     (without-fp-traps
+                       (%ai:ai-import-file
+                        (namestring filename)
+                        (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
+                                                     processing-flags))))
+               (unless (cffi:null-pointer-p raw-scene)
+                 (format t "  translate-scene~%")
+                 (translate-ai-scene raw-scene)))
+          (when raw-scene
+            (format t "  ai-release-import ~s~%" filename)
+            (%ai:ai-release-import raw-scene)))
       (format t "import-into-lisp ~s done~%" filename))))
 
 
@@ -727,7 +727,7 @@
   (let ((log (gensym)))
     `(cffi:with-foreign-object (,log '%ai:ai-log-stream)
        (setf (cffi:foreign-slot-value ,log '%ai:ai-log-stream '%ai:callback)
-                (cffi:callback log-to-*standard-output*))
+             (cffi:callback log-to-*standard-output*))
        #-classimp-broken-logging
        (%ai:ai-attach-log-stream ,log)
        (unwind-protect
