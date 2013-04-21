@@ -182,7 +182,7 @@
                    collect (cffi:mem-aref m :float i)))))
 
 (defun translate-ai-node (node)
-  (print (cffi:foreign-slot-value node '(:struct %ai:ai-node) '%ai:m-num-meshes))
+  ;; (print (cffi:foreign-slot-value node '(:struct %ai:ai-node) '%ai:m-num-meshes))
   (with-foreign-slots* (((:pointer %ai:m-name)
                          (:pointer %ai:m-transformation) %ai:m-parent
                          %ai:m-num-children %ai:m-children
@@ -296,7 +296,7 @@
      'name (translate-ai-string %ai:m-name)
      'weights (translate-ai-array translate-ai-vertex-weight
                                   %ai:m-num-weights %ai:m-weights
-                                  :type %ai:ai-vertex-weight :indirect nil)
+                                  :type (:struct %ai:ai-vertex-weight) :indirect nil)
      'offset-matrix (translate-ai-matrix-4x4 %ai:m-offset-matrix))))
 
 
@@ -340,7 +340,7 @@
                                             collect (translate-ai-array translate-ai-color4f
                                                                         %ai:m-num-vertices
                                                                         c
-                                                                        :type %ai:ai-color-4d
+                                                                        :type (:struct  %ai:ai-color-4d)
                                                                         :indirect nil))))
      'texture-coords
      (apply 'vector
@@ -408,15 +408,15 @@
      'position-keys (translate-ai-array translate-ai-vector-key
                                         %ai:m-num-position-keys
                                         %ai:m-position-keys
-                                        :type %ai:ai-vector-key :indirect nil)
+                                        :type (:struct %ai:ai-vector-key) :indirect nil)
      'rotation-keys (translate-ai-array translate-ai-quaternion-key
                                         %ai:m-num-rotation-keys
                                         %ai:m-rotation-keys
-                                        :type %ai:ai-quat-key :indirect nil)
+                                        :type (:struct %ai:ai-quat-key) :indirect nil)
      'scaling-keys (translate-ai-array translate-ai-vector-key
                                        %ai:m-num-scaling-keys
                                        %ai:m-scaling-keys
-                                       :type %ai:ai-vector-key :indirect nil)
+                                       :type (:struct %ai:ai-vector-key) :indirect nil)
      'pre-state %ai:m-pre-state
      'post-state %ai:m-post-state)))
 
@@ -472,12 +472,11 @@
                     (:ai-pti-integer (data-array '(signed-byte 32) :int))
                     (:ai-pti-string (translate-ai-string32 %ai:m-data))
                     (:ai-pti-buffer (data-array '(unsigned-byte 8) :unsigned-char)))))
-        (if (eq %ai:m-semantic :ai-texture-type-none)
-            (format t "material property: ~s = ~s~%" key data)
-            (format t "material property: ~s / ~s, ~s == ~s~%"
-                    key
-                    %ai:m-semantic %ai:m-index
-                    data))
+        (when *translate-verbose*
+          (if (eq %ai:m-semantic :ai-texture-type-none)
+              (format t "material property: ~s = ~s~%" key data)
+              (format t "material property: ~s / ~s, ~s == ~s~%"
+                      key %ai:m-semantic %ai:m-index data)))
         (list key %ai:m-semantic %ai:m-index data)))))
 
 (defun translate-ai-uv-transform (x)
@@ -504,12 +503,14 @@
                  (cffi:mem-aref %ai:m-data type))
                (keyword (name type)
                  (when (k= name)
-                   (format t "~s = ~s~%" name (single-value type))
+                   (when *translate-verbose*
+                     (format t "~s = ~s~%" name (single-value type)))
                    (list key %ai:m-semantic %ai:m-index (single-value type))))
                (flag (name)
                  (when (k= name)
-                   (format t "~s = ~s = ~s~%" key (single-value :uint)
-                           (not (zerop (single-value :uint))))
+                   (when *translate-verbose*
+                     (format t "~s = ~s = ~s~%" key (single-value :uint)
+                             (not (zerop (single-value :uint)))))
                    (list key %ai:m-semantic %ai:m-index
                          (not (zerop (single-value :uint)))))))
         (cond
@@ -532,7 +533,8 @@
                    %ai:m-data-length
                    (cffi:foreign-type-size '%ai:ai-uv-transform))
            (let ((x (translate-ai-uv-transform %ai:m-data)))
-             (format t "~s = ~s~%" key x)
+             (when *translate-verbose*
+               (format t "~s = ~s~%" key x))
              (list key %ai:m-semantic %ai:m-index x)))
           ((keyword "$tex.blend" '%ai:ai-blend-mode))
           ((keyword "$tex.blend" '%ai:ai-blend-mode))
@@ -543,7 +545,8 @@
 (defun translate-ai-material (m)
   (with-foreign-slots* ((%ai:m-num-properties %ai:m-properties)
                         m (:struct %ai:ai-material))
-    (format t "loading material, ~s properties~%" %ai:m-num-properties)
+    (when *translate-verbose*
+      (format t "loading material, ~s properties~%" %ai:m-num-properties))
     ;; keys are theoretically case insensitive, not sure if they ever
     ;; vary though, since there is a limited set or predefined values
     (loop with hash = (make-hash-table :test 'equalp)
@@ -553,12 +556,14 @@
                                                         :pointer i))
        do (if (eq semantic :ai-texture-type-none)
               (progn
-                (when (gethash key hash)
+                (when (and *translate-verbose*
+                           (gethash key hash))
                   (format t "duplicate key ~s in material? ~s / ~s~%"
                           key (gethash key hash) value))
                 (setf (gethash key hash) value))
               (push (list semantic index value) (gethash key hash nil)))
-       finally (progn (format t " == ~s~%" (alexandria:hash-table-plist hash))
+       finally (progn (when *translate-verbose*
+                        (format t " == ~s~%" (alexandria:hash-table-plist hash)))
                       (return hash)))))
 
 (defun translate-ai-texture (tx)
@@ -603,34 +608,34 @@
                          %ai:m-angle-inner-cone
                          %ai:m-angle-outer-cone)
                         l (:struct %ai:ai-light))
-    (format t "translating light = ")
-    (print (ecase %ai:m-type
-             (:ai-light-source-directional
-              (list %ai:m-type
-                    :name (translate-ai-string %ai:m-name)
-                    :direction (translate-ai-vector3d %ai:m-direction)
-                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-                    :specular (translate-ai-vector3d %ai:m-color-specular)
-                    :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+    (when *translate-verbose* (format t "translating light = "))
+    (ecase %ai:m-type
+      (:ai-light-source-directional
+       (list %ai:m-type
+             :name (translate-ai-string %ai:m-name)
+             :direction (translate-ai-vector3d %ai:m-direction)
+             :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+             :specular (translate-ai-vector3d %ai:m-color-specular)
+             :ambient (translate-ai-vector3d %ai:m-color-ambient)))
 
-             (:ai-light-source-point
-              (list %ai:m-type
-                    :name (translate-ai-string %ai:m-name)
-                    :position (translate-ai-vector3d %ai:m-position)
-                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-                    :specular (translate-ai-vector3d %ai:m-color-specular)
-                    :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+      (:ai-light-source-point
+       (list %ai:m-type
+             :name (translate-ai-string %ai:m-name)
+             :position (translate-ai-vector3d %ai:m-position)
+             :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+             :specular (translate-ai-vector3d %ai:m-color-specular)
+             :ambient (translate-ai-vector3d %ai:m-color-ambient)))
 
-             (:ai-light-source-spot
-              (list %ai:m-type
-                    :name (translate-ai-string %ai:m-name)
-                    :position (translate-ai-vector3d %ai:m-position)
-                    :direction (translate-ai-vector3d %ai:m-direction)
-                    :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
-                    :specular (translate-ai-vector3d %ai:m-color-specular)
-                    :ambient (translate-ai-vector3d %ai:m-color-ambient)
-                    :inner-angle %ai:m-angle-inner-cone
-                    :outer-angle %ai:m-angle-outer-cone))))))
+      (:ai-light-source-spot
+       (list %ai:m-type
+             :name (translate-ai-string %ai:m-name)
+             :position (translate-ai-vector3d %ai:m-position)
+             :direction (translate-ai-vector3d %ai:m-direction)
+             :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+             :specular (translate-ai-vector3d %ai:m-color-specular)
+             :ambient (translate-ai-vector3d %ai:m-color-ambient)
+             :inner-angle %ai:m-angle-inner-cone
+             :outer-angle %ai:m-angle-outer-cone)))))
 
 (defun translate-ai-camera (c)
   (with-foreign-slots* (((:pointer %ai:m-name)
@@ -687,13 +692,14 @@
   #-(and sbcl (or x86 x86-64))
   `(progn ,@body))
 
+;;[TODO] prog1 irrelevant?
 (defun import-into-lisp (filename &key processing-flags raw-times)
-  (let ((raw-scene nil)
-        (*loader-translate-times* (not raw-times)))
+  (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
     (prog1
         (unwind-protect
              (progn
-               (format t "  ai-import-file ~s~%" filename)
+               (when *translate-verbose*
+                 (format t "  ai-import-file ~s~%" filename))
                (setf raw-scene
                      (without-fp-traps
                        (%ai:ai-import-file
@@ -701,12 +707,15 @@
                         (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
                                                      processing-flags))))
                (unless (cffi:null-pointer-p raw-scene)
-                 (format t "  translate-scene~%")
+                 (when *translate-verbose*
+                   (format t "  translate-scene~%"))
                  (translate-ai-scene raw-scene)))
           (when raw-scene
-            (format t "  ai-release-import ~s~%" filename)
+            (when *translate-verbose*
+              (format t "  ai-release-import ~s~%" filename))
             (%ai:ai-release-import raw-scene)))
-      (format t "import-into-lisp ~s done~%" filename))))
+      (when *translate-verbose*
+        (format t "import-into-lisp ~s done~%" filename)))))
 
 
 ;; todo: function to filter unused nodes as suggested in

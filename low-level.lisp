@@ -91,7 +91,7 @@
   (m-duration :double)
   (m-ticks-per-second :double)
   (m-num-channels :unsigned-int)
-  (m-channels (:pointer (:pointer (:struct ai-node-anim))))) ;; [TODO] correct?
+  (m-channels (:pointer (:pointer (:struct ai-node-anim)))))
 
 (cffi:defcstruct ai-matrix-3x-3
   (a-1 :float)
@@ -432,7 +432,7 @@
 
 #-old-assimp
 (cffi:defcfun ("aiGetPredefinedLogStream" ai-get-predefined-log-stream)
-    ai-log-stream ;;[TODO] the fuck?
+    ai-log-stream
   (p-streams ai-default-log-stream)
   (file :string))
 
