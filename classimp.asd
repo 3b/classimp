@@ -7,5 +7,6 @@
                (:file "library")
                (:file "low-level")
                (:file "package")
+               (:file "utils")
                (:file "wrappers"))
   :depends-on (:cffi))
