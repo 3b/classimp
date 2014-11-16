@@ -93,10 +93,7 @@
    (bones :accessor bones :initarg bones :initform nil)
    ;; index into scene material list
    ;; fixme: probably should dereference material and store it here directly?
-   (material-index :accessor material-index :initarg material-index)
-   )
-  
-  )
+   (material-index :accessor material-index :initarg material-index)))
 
 ;; fixme: should probably use the enum/bitfields instead of hard coding #s here
 (defmethod mesh-has-points ((mesh mesh))
@@ -528,10 +525,10 @@
            ;; some files have extra bytes here, not sure if there is
            ;; anything useful there or not...
            (assert (>= %ai:m-data-length
-                       (cffi:foreign-type-size '%ai:ai-uv-transform))
+                       (cffi:foreign-type-size '(:struct %ai:ai-uv-transform)))
                    () "uv-trafo data length =~s expected ~s"
                    %ai:m-data-length
-                   (cffi:foreign-type-size '%ai:ai-uv-transform))
+                   (cffi:foreign-type-size '(:struct %ai:ai-uv-transform)))
            (let ((x (translate-ai-uv-transform %ai:m-data)))
              (when *translate-verbose*
                (format t "~s = ~s~%" key x))
