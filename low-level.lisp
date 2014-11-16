@@ -1,6 +1,8 @@
 (cl:in-package :%open-asset-import-library)
 
-(cffi::defctype size-t :unsigned-long)
+;; long is not always equal to size_t, long is 4 bytes on Windows 64
+#+cffi-features:x86-64 (cffi::defctype size-t :unsigned-long-long)
+#-cffi-features:x86-64 (cffi::defctype size-t :unsigned-long)
 
 (cffi:defcstruct ai-string
   (length size-t)
