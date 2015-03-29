@@ -9,4 +9,4 @@
                (:file "files")
                (:file "sample3")
                )
-  :depends-on (:classimp :sb-cga :cl-glut :cl-glu :cl-fad :cl-devil))
+  :depends-on (:classimp :sb-cga :cl-glut :cl-glu :cl-fad :cl-ilut))
