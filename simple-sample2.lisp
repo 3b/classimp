@@ -271,8 +271,14 @@
           (probe-file file))
   (ai:with-log-to-stdout ()
     (let ((scene
-           (ai:import-into-lisp file
-                                :processing-flags '(:ai-process-preset-target-realtime-quality))))
+            #++
+            (ai:import-into-lisp file
+                                 :processing-flags '(:ai-process-remove-component
+                                                     :ai-process-gen-smooth-normals)
+                                 :properties '(:pp-rvc-flags (:normals)
+                                               :pp-gsn-max-smoothing-angle 10))
+            (ai:import-into-lisp file
+                                 :processing-flags '(:ai-process-preset-target-realtime-quality))))
       (when scene (glut:display-window (make-instance 'ai-sample2-window
                                                       :scene scene))))))
 

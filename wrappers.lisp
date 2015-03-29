@@ -689,20 +689,22 @@
   #-(and sbcl (or x86 x86-64))
   `(progn ,@body))
 
-;;[TODO] prog1 irrelevant?
-(defun import-into-lisp (filename &key processing-flags raw-times)
+(defun import-into-lisp (filename &key processing-flags raw-times properties)
   (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
     (prog1
         (unwind-protect
-             (progn
+             (let ((flags (cffi:foreign-bitfield-value
+                           '%ai:ai-post-process-steps processing-flags)))
                (when *translate-verbose*
                  (format t "  ai-import-file ~s~%" filename))
                (setf raw-scene
                      (without-fp-traps
-                       (%ai:ai-import-file
-                        (namestring filename)
-                        (cffi:foreign-bitfield-value '%ai:ai-post-process-steps
-                                                     processing-flags))))
+                       (if properties
+                           (with-property-store (store :properties properties)
+                             (%ai:ai-import-file-ex-with-properties
+                              (namestring filename) flags
+                              (cffi:null-pointer) store))
+                           (%ai:ai-import-file (namestring filename) flags))))
                (unless (cffi:null-pointer-p raw-scene)
                  (when *translate-verbose*
                    (format t "  translate-scene~%"))

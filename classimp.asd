@@ -8,5 +8,6 @@
                (:file "low-level")
                (:file "package")
                (:file "utils")
+               (:file "config")
                (:file "wrappers"))
   :depends-on (:cffi))

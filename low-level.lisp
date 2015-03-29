@@ -135,7 +135,7 @@
 
 (cffi:defcfun ("aiSetImportPropertyFloat" ai-set-import-property-float) :void
   (store :pointer) ;; added in 3.0
-  (sz-name :pointer)
+  (sz-name :string)
   (value :float))
 
 (cffi:defcstruct ai-material
@@ -469,7 +469,19 @@
   (:ai-component-lights 256)
   (:ai-component-cameras 512)
   (:ai-component-meshes 1024)
-  (:ai-component-materials 2048))
+  (:ai-component-materials 2048)
+  ;; probably should get rid of long-name versions?
+  (:normals 2)
+  (:tangents-and-bitangents 4)
+  (:colors 8)
+  (:texcoords 16)
+  (:boneweights 32)
+  (:animations 64)
+  (:textures 128)
+  (:lights 256)
+  (:cameras 512)
+  (:meshes 1024)
+  (:materials 2048))
 
 (cffi::defctype ai-file-open-proc :pointer)
 
@@ -572,8 +584,8 @@
 
 (cffi:defcfun ("aiSetImportPropertyString" ai-set-import-property-string) :void
   (store :pointer) ;; added in 3.0
-  (sz-name :pointer)
-  (st :pointer))
+  (sz-name :string)
+  (st :string))
 
 #-old-assimp
 (cffi:defcfun ("aiEnableVerboseLogging" ai-enable-verbose-logging) :void
@@ -606,13 +618,13 @@
 (cffi:defcfun ("aiGetCompileFlags" ai-get-compile-flags) :unsigned-int)
 
 (cffi:defcfun ("aiImportFileEx" ai-import-file-ex) :pointer
-  (p-file :pointer)
+  (p-file :string)
   (p-flags ai-post-process-steps)
   (p-fs :pointer))
 
 ;; 3.0
 (cffi:defcfun ("aiImportFileExWithProperties" ai-import-file-ex-with-properties) :pointer
-  (p-file :pointer)
+  (p-file :string)
   (p-flags ai-post-process-steps)
   (p-fs :pointer)
   (p-props :pointer))
@@ -639,7 +651,7 @@
 
 (cffi:defcfun ("aiSetImportPropertyInteger" ai-set-import-property-integer) :void
   (store :pointer) ;; added in 3.0
-  (sz-name :pointer)
+  (sz-name :string)
   (value :int))
 
 (cffi:defcfun ("aiReleaseImport" ai-release-import) :void (p-scene :pointer))
@@ -662,7 +674,12 @@
   (:ai-primitive-type-point 1)
   (:ai-primitive-type-line 2)
   (:ai-primitive-type-triangle 4)
-  (:ai-primitive-type-polygon 8))
+  (:ai-primitive-type-polygon 8)
+  ;; probably should get rid of long-name versions?
+  (:point 1)
+  (:line 2)
+  (:triangle 4)
+  (:polygon 8))
 
 #-old-assimp
 (cffi:defcfun ("aiApplyPostProcessing" ai-apply-post-processing) :pointer

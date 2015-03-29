@@ -339,5 +339,8 @@
            #:write-proc
            #:x
            #:y
-           #:z))
+           #:z
+           #:ai-import-file-ex-with-properties
+           #:ai-create-property-store
+           #:ai-release-property-store))
 
