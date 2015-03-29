@@ -593,7 +593,7 @@
 
 (defun translate-ai-light (l)
   (with-foreign-slots* (((:pointer %ai:m-name)
-                         (:pointer %ai:m-type)
+                          %ai:m-type
                          (:pointer %ai:m-position)
                          (:pointer %ai:m-direction)
                          %ai:m-attenuation-constant
