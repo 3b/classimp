@@ -392,8 +392,8 @@
                          %ai:m-rotation-keys
                          %ai:m-num-scaling-keys
                          %ai:m-scaling-keys
-                         (:pointer %ai:m-pre-state)
-                         (:pointer %ai:m-post-state)) a
+                         %ai:m-pre-state
+                         %ai:m-post-state) a
                         (:struct %ai:ai-node-anim))
     (when *translate-verbose*
       (format t "load anim keys for node ~s, ~s / ~s / ~s keys~%"
