@@ -743,6 +743,57 @@
       (when *translate-verbose*
         (format t "import-into-lisp ~s done~%" filename)))))
 
+(defun import-into-lisp/memory (foreign-pointer size
+                                     &key processing-flags raw-times properties
+                                       (extension ""))
+  (check-version)
+  (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
+    (prog1
+        (unwind-protect
+             (let ((flags (cffi:foreign-bitfield-value
+                           '%ai:ai-post-process-steps processing-flags)))
+               (when *translate-verbose*
+                 (format t "  ai-import-memory ~x :~s (~s) ~%"
+                         foreign-pointer size extension))
+               (cffi:with-foreign-string (hint (if (stringp extension)
+                                                   extension
+                                                   ""))
+                (setf raw-scene
+                      (without-fp-traps
+                        (let ((hint (cond
+                                      ((stringp extension)
+                                       hint)
+                                      ((cffi:pointerp extension)
+                                       extension)
+                                      (t (cffi:null-pointer)))))
+                          (format t "==(~s)" (cffi:foreign-string-to-lisp hint))
+                          (if properties
+                              (with-property-store (store :properties properties)
+                                (%ai:ai-import-file-from-memory-with-properties
+                                 foreign-pointer size flags
+                                 hint
+                                 store))
+                              (%ai:ai-import-file-from-memory
+                               foreign-pointer size flags hint))))))
+               (unless (cffi:null-pointer-p raw-scene)
+                 (when *translate-verbose*
+                   (format t "  translate-scene~%"))
+                 (translate-ai-scene raw-scene)))
+          (when raw-scene
+            (when *translate-verbose*
+              (format t "  ai-release-import ~x~%" foreign-pointer))
+            (%ai:ai-release-import raw-scene)))
+      (when *translate-verbose*
+        (format t "import-into-lisp/memory ~x done~%" foreign-pointer)))))
+
+(defun import-into-lisp/string (string
+                                &key processing-flags raw-times properties
+                                  (extension ""))
+  (cffi:with-foreign-string ((s l) string)
+    (import-into-lisp/memory s l :processing-flags processing-flags
+                                 :raw-times raw-times
+                                 :properties properties
+                                 :extension extension)))
 
 ;; todo: function to filter unused nodes as suggested in
 ;; http://assimp.sourceforge.net/lib_html/data.html#bones

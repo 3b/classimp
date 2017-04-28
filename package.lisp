@@ -59,4 +59,6 @@
            #:with-log-to-file
            #:with-log-to-stdout
            #:pre-state
-           #:post-state))
+           #:post-state
+           #:import-into-lisp/string
+           #:import-into-lisp/memory))
