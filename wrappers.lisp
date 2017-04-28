@@ -632,7 +632,24 @@
              :specular (translate-ai-vector3d %ai:m-color-specular)
              :ambient (translate-ai-vector3d %ai:m-color-ambient)
              :inner-angle %ai:m-angle-inner-cone
-             :outer-angle %ai:m-angle-outer-cone)))))
+             :outer-angle %ai:m-angle-outer-cone))
+
+      (:ai-light-source-ambient ;; 3.2+
+       (list %ai:m-type
+             :name (translate-ai-string %ai:m-name)
+             :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+             :specular (translate-ai-vector3d %ai:m-color-specular)
+             :ambient (translate-ai-vector3d %ai:m-color-ambient)))
+
+      (:ai-light-source-area ;; 3.3+
+       (list %ai:m-type
+             :name (translate-ai-string %ai:m-name)
+             :position (translate-ai-vector3d %ai:m-position)
+             :direction (translate-ai-vector3d %ai:m-direction)
+             :diffuse (translate-ai-vector3d %ai:m-color-diffuse)
+             :specular (translate-ai-vector3d %ai:m-color-specular)
+             :ambient (translate-ai-vector3d %ai:m-color-ambient)
+             :area %ai:m-angle-inner-cone)))))
 
 (defun translate-ai-camera (c)
   (with-foreign-slots* (((:pointer %ai:m-name)
@@ -655,7 +672,16 @@
           :clip-far %ai:m-clip-plane-far
           :aspect %ai:m-aspect)))
 
+(defun check-version ()
+  (let* ((major (%ai:ai-get-version-major))
+         (minor (%ai:ai-get-version-major))
+         (version (intern (format () "~a.~a" major minor) :keyword)))
+    (unless (eql version %ai::*version*)
+      (cerror "try using it anyway"
+              "classimp was compiled for assimp version ~a, current assimp version is ~a" %ai::*version* version))))
+
 (defun translate-ai-scene (scene)
+  (check-version)
   (with-foreign-slots* ((%ai:m-flags %ai:m-root-node
                                      %ai:m-num-meshes %ai:m-meshes
                                      %ai:m-num-materials %ai:m-materials
@@ -690,6 +716,7 @@
   `(progn ,@body))
 
 (defun import-into-lisp (filename &key processing-flags raw-times properties)
+  (check-version)
   (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
     (prog1
         (unwind-protect

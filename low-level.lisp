@@ -1,23 +1,90 @@
 (cl:in-package :%open-asset-import-library)
 
+(cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
+(cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
+
+;; try to determine library version at compile/load time
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+  (cl:defvar *version* :unknown)
+  (cl:defvar *compiled* ())
+  (cl:defun get-version-keyword ()
+    (cl:let* ((major (cl:ignore-errors (ai-get-version-major)))
+              (minor (cl:ignore-errors (ai-get-version-minor)))
+              (new-version (cl:intern
+                            (cl:format () "~a.~a" major minor) :keyword)))
+      (cl:values new-version major minor)))
+  (cl:defun %v= (req)
+    (cl:ecase req
+      (:3.0-3.3 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3))) ;; exact versions
+      (:3.0+ (cl:member *version* '(:3.0 :3.1 :3.2 :3.3)))
+      (:3.1+ (cl:member *version* '(:3.1 :3.2 :3.3)))
+      (:3.2+ (cl:member *version* '(:3.2 :3.3)))
+      (:3.3+ (cl:member *version* '(:3.3)))
+      (:>3.3 ()))))
+
+(cl:eval-when (:compile-toplevel)
+  (cl:setf *compiled* cl:t)
+  (cl:when (cffi:foreign-library-loaded-p 'assimp)
+    ;; try to check version of C library
+    (cl:multiple-value-bind (new-version major minor)
+        (get-version-keyword)
+      (cl:when (cl:and major minor)
+        (cl:unless (cl:and (cl:= major 3)
+                           (cl:<= 0 minor 3))
+          (cl:error "trying to link against unsupported version of assimp. 3.0-3.3.x supported, got version ~a.~a"
+                    major minor))
+        (cl:setf *version* new-version)))))
+
+(cl:eval-when (:load-toplevel :execute)
+  (cl:when (cffi:foreign-library-loaded-p 'assimp)
+    (cl:multiple-value-bind (new-version major minor)
+        (get-version-keyword)
+      (cl:when (cl:and major minor)
+        (cl:unless (cl:and (cl:= major 3)
+                           (cl:<= 0 minor 3))
+          (cl:error "trying to link against unsupported version of assimp. 3.0-3.3.x supported, got version ~a.~a"
+                    major minor))
+        (cl:cond
+          ((cl:and *compiled* (cl:eql new-version *version*))
+           ;; version matches
+           )
+          ((cl:not *compiled*)
+           ;; not compiled, use current version
+           (cl:setf *version* new-version))
+          (cl:t ;; version mismatch
+           (cl:error "classimp was compiled with different version of assimp, was ~a, now ~a" *version* new-version)))))))
+
+
 ;; long is not always equal to size_t, long is 4 bytes on Windows 64
 #+cffi-features:x86-64 (cffi::defctype size-t :unsigned-long-long)
 #-cffi-features:x86-64 (cffi::defctype size-t :unsigned-long)
 
-(cffi:defcstruct ai-string
+
+;; versioned version of cffi:defstruct
+(cl:defmacro defcstruct/v (name-and-options cl:&body fields)
+  `(cffi:defcstruct ,name-and-options
+     ,@(cl:loop for f in fields
+          for v = (cl:when (cl:typep f '(cl:cons cl:keyword))
+                    (cl:car f))
+          when (cl:and v (%v= v))
+            collect (cl:second f)
+          else unless v
+                 collect f)))
+
+(cffi:defcstruct ai-string ;; 3.0+
   (length size-t)
   (data :char :count 1024))
 
-(cffi:defcstruct ai-string32
+(cffi:defcstruct ai-string32 ;; 3.0+, used in material string properties
   (length :uint32)
   (data :char :count 1024))
 
-(cffi:defcstruct ai-vector-3d
+(cffi:defcstruct ai-vector-3d ;; 3.0+
   (x :float)
   (y :float)
   (z :float))
 
-(cffi:defcstruct ai-camera
+(cffi:defcstruct ai-camera ;; 3.0+
   (m-name (:struct ai-string))
   (m-position (:struct ai-vector-3d))
   (m-up (:struct ai-vector-3d))
@@ -27,57 +94,58 @@
   (m-clip-plane-far :float)
   (m-aspect :float))
 
-(cffi:defcenum (ai-origin :int)
+(cffi:defcenum (ai-origin :int) ;; 3.0+
   (:ai-origin-set 0)
   (:ai-origin-cur 1)
   (:ai-origin-end 2))
 
-(cffi:defcstruct ai-color-3d
+(cffi:defcstruct ai-color-3d ;; 3.0+
   (r :float)
   (g :float)
   (b :float))
 
 (cffi:defcenum (ai-property-type-info :int)
   (:ai-pti-float 1)
+  (:ai-pti-double 2) ;; >3.3
   (:ai-pti-string 3)
   (:ai-pti-integer 4)
   (:ai-pti-buffer 5))
 
-(cffi::defctype ai-bool :int)
+(cffi::defctype ai-bool :int) ;; 3.0+
 
 (cffi:defcfun ("aiIsExtensionSupported" ai-is-extension-supported) ai-bool
   (sz-extension :pointer))
 
-(cffi:defcstruct ai-vector-2d
+(cffi:defcstruct ai-vector-2d ;; 3.0+
   (x :float)
   (y :float))
 
-(cffi:defcenum (ai-return :int)
+(cffi:defcenum (ai-return :int) ;; 3.0+
   (:ai-return-success 0)
   (:ai-return-failure -1)
   (:ai-return-outofmemory -3))
 
-(cffi:defcstruct ai-vector-key
+(cffi:defcstruct ai-vector-key ;; 3.0+
   (m-time :double)
   (m-value (:struct ai-vector-3d)))
 
-(cffi:defcstruct ai-quaternion
+(cffi:defcstruct ai-quaternion ;; 3.0+
   (w :float)
   (x :float)
   (y :float)
   (z :float))
 
-(cffi:defcstruct ai-quat-key
+(cffi:defcstruct ai-quat-key ;; 3.0+
   (m-time :double)
   (m-value (:struct ai-quaternion)))
 
-(cffi:defcenum (ai-anim-behaviour :unsigned-int)
+(cffi:defcenum (ai-anim-behaviour :unsigned-int) ;; 3.0+
   (:ai-anim-behaviour-default 0)
   (:ai-anim-behaviour-constant 1)
   (:ai-anim-behaviour-linear 2)
   (:ai-anim-behaviour-repeat 3))
 
-(cffi:defcstruct ai-node-anim
+(cffi:defcstruct ai-node-anim ;; 3.0+
   (m-node-name (:struct ai-string))
   (m-num-position-keys :unsigned-int)
   (m-position-keys (:pointer (:struct ai-vector-key)))
@@ -88,14 +156,14 @@
   (m-pre-state ai-anim-behaviour)
   (m-post-state ai-anim-behaviour))
 
-(cffi:defcstruct ai-animation
+(cffi:defcstruct ai-animation ;; 3.0+
   (m-name (:struct ai-string))
   (m-duration :double)
   (m-ticks-per-second :double)
   (m-num-channels :unsigned-int)
   (m-channels (:pointer (:pointer (:struct ai-node-anim)))))
 
-(cffi:defcstruct ai-matrix-3x-3
+(cffi:defcstruct ai-matrix-3x-3 ;; 3.0+
   (a-1 :float)
   (a-2 :float)
   (a-3 :float)
@@ -110,7 +178,7 @@
   (quat :pointer)
   (mat :pointer))
 
-(cffi:defcenum (ai-texture-type :int)
+(cffi:defcenum (ai-texture-type :int) ;; 3.0+
   (:ai-texture-type-none 0)
   (:ai-texture-type-diffuse 1)
   (:ai-texture-type-specular 2)
@@ -125,7 +193,7 @@
   (:ai-texture-type-reflection 11)
   (:ai-texture-type-unknown 12))
 
-(cffi:defcstruct ai-material-property
+(cffi:defcstruct ai-material-property ;; 3.0+
   (m-key (:struct ai-string))
   (m-semantic ai-texture-type)
   (m-index :unsigned-int)
@@ -138,7 +206,7 @@
   (sz-name :string)
   (value :float))
 
-(cffi:defcstruct ai-material
+(cffi:defcstruct ai-material ;; 3.0+
   (m-properties (:pointer (:pointer (:struct ai-material-property))))
   (m-num-properties :unsigned-int)
   (m-num-allocated :unsigned-int))
@@ -151,7 +219,7 @@
   (index :unsigned-int)
   (p-prop-out :pointer))
 
-(cffi:defcstruct ai-matrix-4x-4
+(cffi:defcstruct ai-matrix-4x-4 ;; 3.0+
   (a-1 :float)
   (a-2 :float)
   (a-3 :float)
@@ -169,30 +237,50 @@
   (d-3 :float)
   (d-4 :float))
 
-(cffi:defcstruct ai-node
+(cl:when (%v= :3.1+)
+  (cffi:defcenum (ai-metadata-type :int) ;; 3.1+
+    (:bool 0)
+    (:int 1)
+    (:uint64 2)
+    (:float 3)
+    (:double 4)
+    (:ai-string 5)
+    (:ai-vector-3d 6))
+
+  (cffi:defcstruct ai-metadata-entry ;; 3.1+
+    (m-type ai-metadata-type)
+    (data (:pointer :void)))
+
+  (cffi:defcstruct ai-metadata ;; 3.1+
+    (m-num-properties :unsigned-int)
+    (m-keys (:pointer (:struct ai-string)))
+    (m-values (:pointer (:struct ai-metadata-entry)))))
+
+(defcstruct/v ai-node ;; 3.0+
   (m-name (:struct ai-string))
   (m-transformation (:struct ai-matrix-4x-4))
-  (m-parent :pointer)
+  (m-parent (:pointer (:struct ai-node)))
   (m-num-children :unsigned-int)
-  (m-children :pointer)
+  (m-children (:pointer (:pointer (:struct ai-node))))
   (m-num-meshes :unsigned-int)
-  (m-meshes (:pointer :unsigned-int)))
+  (m-meshes (:pointer :unsigned-int))
+  (:3.1+ (m-metadata (:pointer (:struct ai-metadata))))) ;; 3.1+
 
-(cffi:defcstruct ai-color-4d
+(cffi:defcstruct ai-color-4d ;; 3.0+
   (r :float)
   (g :float)
   (b :float)
   (a :float))
 
-(cffi:defcstruct ai-face
+(cffi:defcstruct ai-face ;; 3.0+
   (m-num-indices :unsigned-int)
   (m-indices (:pointer :unsigned-int)))
 
-(cffi:defcstruct ai-vertex-weight
+(cffi:defcstruct ai-vertex-weight ;; 3.0+
   (m-vertex-id :unsigned-int)
   (m-weight :float))
 
-(cffi:defcstruct ai-bone
+(cffi:defcstruct ai-bone ;; 3.0+
   (m-name (:struct ai-string))
   (m-num-weights :unsigned-int)
   (m-weights (:pointer (:struct ai-vertex-weight)))
@@ -201,11 +289,11 @@
 ;; fixme: probably should grovel these, aiMesh.h says they shouldn't change
 ;; though, so ignoring for now...
 ;; ... they changed anyway :/
-(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+(cl:eval-when (:compile-toplevel :load-toplevel :execute) ;; 3.0+
   (cl:defconstant +ai-max-number-of-color-sets+ 8)
   (cl:defconstant +ai-max-number-of-texturecoords+ 8))
 
-;; 3.0 assimp doco says this is unused unused
+;; 3.0-3.3 comments say this is unused, but possibly added some use in git since
 #++
 (cffi:defcstruct ai-anim-mesh
   (m-vertices :pointer)
@@ -214,9 +302,10 @@
   (m-bitangents :pointer)
   (m-colors :pointer :count #.+ai-max-number-of-color-sets+)
   (m-texture-coords :pointer :count #.+ai-max-number-of-texturecoords+)
-  (m-num-vertices :unsigned-int))
+  (m-num-vertices :unsigned-int)
+  (m-weight :float)) ;; >3.3
 
-(cffi:defcstruct ai-mesh
+(cffi:defcstruct ai-mesh ;; 3.0+
   (m-primitive-types :unsigned-int)
   (m-num-vertices :unsigned-int)
   (m-num-faces :unsigned-int)
@@ -224,9 +313,9 @@
   (m-normals (:pointer (:struct ai-vector-3d)))
   (m-tangents (:pointer (:struct ai-vector-3d)))
   (m-bitangents (:pointer (:struct ai-vector-3d)))
-  (m-colors (:pointer (:struct ai-color-4d)) 
+  (m-colors (:pointer (:struct ai-color-4d))
             :count #.+ai-max-number-of-color-sets+)
-  (m-texture-coords (:pointer (:struct ai-vector-3d)) 
+  (m-texture-coords (:pointer (:struct ai-vector-3d))
                     :count #.+ai-max-number-of-texturecoords+)
   (m-num-uv-components :unsigned-int
                        :count #.+ai-max-number-of-texturecoords+)
@@ -234,33 +323,39 @@
   (m-num-bones :unsigned-int)
   (m-bones (:pointer (:pointer (:struct ai-bone))))
   (m-material-index :unsigned-int)
-  (m-name (:struct ai-string)) ;; 3.0
-  (m-num-anim-meshes :unsigned-int) ;; 3.0, unused
-  (m-anim-meshes :pointer)) ;; 3.0 unused
+  (m-name (:struct ai-string)) ;; 3.0+
+  (m-num-anim-meshes :unsigned-int) ;; 3.0+, unused up to 3.3
+  (m-anim-meshes :pointer) ;; 3.0+, unused up to 3.3
+  (m-method :unsigned-int)) ;; >3.3
 
-(cffi:defcstruct ai-texel
+(cffi:defcstruct ai-texel ;; 3.0+
   (b :unsigned-char)
   (g :unsigned-char)
   (r :unsigned-char)
   (a :unsigned-char))
 
-(cffi:defcstruct ai-texture
+(defcstruct/v ai-texture ;; 3.0+
   (m-width :unsigned-int)
   (m-height :unsigned-int)
-  (ach-format-hint :char :count 4)
+  ;; ach-format-hint changed size some time after 3.3
+  (:3.0-3.3 (ach-format-hint :char :count 4))
+  (:>3.3 (ach-format-hint :char :count 9))
   (pc-data (:pointer (:struct ai-texel))))
 
-(cffi:defcenum (ai-light-source-type :int)
+(cffi:defcenum (ai-light-source-type :int) ;; 3.0+
   (:ai-light-source-undefined 0)
   (:ai-light-source-directional 1)
   (:ai-light-source-point 2)
-  (:ai-light-source-spot 3))
+  (:ai-light-source-spot 3)
+  (:ai-light-source-ambient 4) ;; 3.2+
+  (:ai-light-source-area 5)) ;; 3.3+
 
-(cffi:defcstruct ai-light
+(defcstruct/v ai-light ;; 3.0+
   (m-name (:struct ai-string))
   (m-type ai-light-source-type)
   (m-position (:struct ai-vector-3d))
   (m-direction (:struct ai-vector-3d))
+  (:3.3+ (m-up (:struct ai-vector-3d))) ;; 3.3
   (m-attenuation-constant :float)
   (m-attenuation-linear :float)
   (m-attenuation-quadratic :float)
@@ -268,9 +363,10 @@
   (m-color-specular (:struct ai-color-3d))
   (m-color-ambient (:struct ai-color-3d))
   (m-angle-inner-cone :float)
-  (m-angle-outer-cone :float))
+  (m-angle-outer-cone :float)
+  (:3.3+ (m-size (:struct ai-vector-2d))))
 
-(cffi:defcstruct ai-scene
+(cffi:defcstruct ai-scene ;; 3.0+
   (m-flags :unsigned-int)
   (m-root-node (:pointer (:struct ai-node)))
   (m-num-meshes :unsigned-int)
@@ -320,7 +416,7 @@
 
   )
 
-(cffi:defbitfield ai-post-process-steps
+(cffi:defbitfield ai-post-process-steps ;; 3.0+
   (:ai-process-calc-tangent-space #x1)
   (:ai-process-join-identical-vertices #x2)
   (:ai-process-make-left-handed #x4)
@@ -345,6 +441,8 @@
   (:ai-process-optimize-graph #x400000)
   (:ai-process-flip-u-vs #x800000)
   (:ai-process-flip-winding-order #x1000000)
+  (:ai-process-split-by-bone-count #x2000000)
+  (:ai-process-debone #x4000000)
 
   (:ai-process-convert-to-left-handed #x1800004
                                       #-(and) (:ai-process-make-left-handed
@@ -386,12 +484,12 @@
   (p-file :string)
   (p-flags ai-post-process-steps))
 
-(cffi:defcstruct ai-uv-transform
+(cffi:defcstruct ai-uv-transform ;; 3.0+
   (m-translation (:struct ai-vector-2d))
   (m-scaling (:struct ai-vector-2d))
   (m-rotation :float))
 
-(cffi:defcstruct ai-memory-info
+(cffi:defcstruct ai-memory-info ;; 3.0+
   (textures :unsigned-int)
   (materials :unsigned-int)
   (meshes :unsigned-int)
@@ -420,25 +518,26 @@
 #-old-assimp
 (cffi:defcfun ("aiDetachAllLogStreams" ai-detach-all-log-streams) :void)
 
+;; typedef void (*aiLogStreamCallback)(const char* /* message */, char* /* user */);
 (cffi::defctype ai-log-stream-callback :pointer)
 
-(cffi:defcstruct ai-log-stream
+(cffi:defcstruct ai-log-stream ;; 3.0+
   (callback ai-log-stream-callback)
   (user (:pointer :char)))
 
-(cffi:defbitfield (ai-default-log-stream :int)
+(cffi:defbitfield (ai-default-log-stream :int) ;; 3.0+
   (:ai-default-log-stream-file 1)
   (:ai-default-log-stream-stdout 2)
   (:ai-default-log-stream-stderr 4)
   (:ai-default-log-stream-debugger 8))
 
-#-old-assimp
+#-(or old-assimp (not fsbv))
 (cffi:defcfun ("aiGetPredefinedLogStream" ai-get-predefined-log-stream)
-    ai-log-stream
+    (:struct ai-log-stream)
   (p-streams ai-default-log-stream)
   (file :string))
 
-(cffi:defcenum (ai-shading-mode :int)
+(cffi:defcenum (ai-shading-mode :int) ;; 3.0+
   (:ai-shading-mode-flat 1)
   (:ai-shading-mode-gouraud 2)
   (:ai-shading-mode-phong 3)
@@ -450,51 +549,55 @@
   (:ai-shading-mode-no-shading 9)
   (:ai-shading-mode-fresnel 10))
 
+;; typedef size_t (*aiFileReadProc) (struct aiFile*, char*, size_t,size_t);
 (cffi::defctype ai-file-read-proc :pointer)
 
 (cffi:defcfun ("aiGetMemoryRequirements" ai-get-memory-requirements) :void
   (p-in :pointer)
   (in :pointer))
 
+;; typedef size_t (*aiFileTellProc) (C_STRUCT aiFile*);
 (cffi::defctype ai-file-tell-proc :pointer)
 
-(cffi:defcenum (ai-component :unsigned-int)
+(cffi:defcenum (ai-component :unsigned-int) ;; 3.0+
   (:ai-component-normals 2)
   (:ai-component-tangents-and-bitangents 4)
   (:ai-component-colors 8)
-  (:ai-component-texcoords 16)
-  (:ai-component-boneweights 32)
-  (:ai-component-animations 64)
-  (:ai-component-textures 128)
-  (:ai-component-lights 256)
-  (:ai-component-cameras 512)
-  (:ai-component-meshes 1024)
-  (:ai-component-materials 2048)
+  (:ai-component-texcoords #x10)
+  (:ai-component-boneweights #x20)
+  (:ai-component-animations #x40)
+  (:ai-component-textures #x80)
+  (:ai-component-lights #x100)
+  (:ai-component-cameras #x200)
+  (:ai-component-meshes #x400)
+  (:ai-component-materials #x800)
   ;; probably should get rid of long-name versions?
   (:normals 2)
   (:tangents-and-bitangents 4)
   (:colors 8)
-  (:texcoords 16)
-  (:boneweights 32)
-  (:animations 64)
-  (:textures 128)
-  (:lights 256)
-  (:cameras 512)
-  (:meshes 1024)
-  (:materials 2048))
+  (:texcoords #x10)
+  (:boneweights #x20)
+  (:animations #x40)
+  (:textures #x80)
+  (:lights #x100)
+  (:cameras #x200)
+  (:meshes #x400)
+  (:materials #x800))
 
+;; typedef struct aiFile* (*aiFileOpenProc) (struct aiFileIO*, const char*, const char*);
 (cffi::defctype ai-file-open-proc :pointer)
 
+;; typedef void (*aiFileCloseProc) (struct aiFileIO*, struct aiFile*);
 (cffi::defctype ai-file-close-proc :pointer)
 
 (cffi::defctype ai-user-data (:pointer :char))
 
-(cffi:defcstruct ai-file-io
+(cffi:defcstruct ai-file-io ;; 3.0+
   (open-proc ai-file-open-proc)
   (close-proc ai-file-close-proc)
   (user-data ai-user-data))
 
-(cffi:defcenum (ai-texture-mapping :int)
+(cffi:defcenum (ai-texture-mapping :int) ;; 3.0+
   (:ai-texture-mapping-uv 0)
   (:ai-texture-mapping-sphere 1)
   (:ai-texture-mapping-cylinder 2)
@@ -502,7 +605,7 @@
   (:ai-texture-mapping-plane 4)
   (:ai-texture-mapping-other 5))
 
-(cffi:defcenum (ai-texture-op :int)
+(cffi:defcenum (ai-texture-op :int) ;; 3.0+
   (:ai-texture-op-multiply 0)
   (:ai-texture-op-add 1)
   (:ai-texture-op-subtract 2)
@@ -510,7 +613,7 @@
   (:ai-texture-op-smooth-add 4)
   (:ai-texture-op-signed-add 5))
 
-(cffi:defcenum (ai-texture-map-mode :int)
+(cffi:defcenum (ai-texture-map-mode :int) ;; 3.0+
   (:ai-texture-map-mode-wrap 0)
   (:ai-texture-map-mode-clamp 1)
   (:ai-texture-map-mode-decal 3)
@@ -528,13 +631,16 @@
   (mapmode :pointer)
   (flags (:pointer :unsigned-int)))
 
+;; typedef size_t (*aiFileWriteProc) (struct aiFile*, const char*, size_t, size_t);
 (cffi::defctype ai-file-write-proc :pointer)
 
+;; typedef enum aiReturn (*aiFileSeek) (struct aiFile*, size_t, enum aiOrigin);
 (cffi::defctype ai-file-seek :pointer)
 
+;; typedef void (*aiFileFlushProc) (struct aiFile*);
 (cffi::defctype ai-file-flush-proc :pointer)
 
-(cffi:defcstruct ai-file
+(cffi:defcstruct ai-file ;; 3.0+
   (read-proc  ai-file-read-proc)
   (write-proc  ai-file-write-proc)
   (tell-proc  ai-file-tell-proc)
@@ -545,12 +651,13 @@
 
 (cffi:defcfun ("aiGetErrorString" ai-get-error-string) :pointer)
 
-(cffi:defcfun ("aiDecomposeMatrix" ai-decompose-matrix) :void (mat :pointer)
-              (scaling :pointer)
-              (rotation :pointer)
-              (position :pointer))
+(cffi:defcfun ("aiDecomposeMatrix" ai-decompose-matrix) :void
+  (mat (:pointer (:struct ai-matrix-4x-4)))
+  (scaling (:pointer (:struct ai-vector-3d)))
+  (rotation (:pointer (:struct ai-quaternion)))
+  (position (:pointer (:struct ai-vector-3d))))
 
-(cffi:defbitfield (ai-texture-flags :int)
+(cffi:defbitfield (ai-texture-flags :int) ;; 3.0+
   (:ai-texture-flags-invert 1)
   (:ai-texture-flags-use-alpha 2)
   (:ai-texture-flags-ignore-alpha 4))
@@ -558,9 +665,7 @@
 (cffi:defcfun ("aiGetExtensionList" ai-get-extension-list) :void
   (sz-out :pointer))
 
-(cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
-
-(cffi:defcstruct ai-plane
+(cffi:defcstruct ai-plane ;; 3.0+
   (a :float)
   (b :float)
   (c :float)
@@ -579,8 +684,6 @@
 #-old-assimp
 (cffi:defcfun ("aiDetachLogStream" ai-detach-log-stream) ai-return
   (stream :pointer))
-
-(cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
 
 (cffi:defcfun ("aiSetImportPropertyString" ai-set-import-property-string) :void
   (store :pointer) ;; added in 3.0
@@ -602,7 +705,7 @@
   (p-out (:pointer :int))
   (p-max (:pointer :unsigned-int)))
 
-(cffi:defcstruct ai-ray
+(cffi:defcstruct ai-ray ;; 3.0+
   (pos (:struct ai-vector-3d))
   (dir (:struct ai-vector-3d)))
 
@@ -645,7 +748,7 @@
   (index :unsigned-int)
   (p-out :pointer))
 
-(cffi:defcenum (ai-blend-mode :int)
+(cffi:defcenum (ai-blend-mode :int) ;; 3.0+
   (:ai-blend-mode-default 0)
   (:ai-blend-mode-additive 1))
 
@@ -670,7 +773,7 @@
 (cffi:defcfun ("aiMultiplyMatrix4" ai-multiply-matrix-4) :void (dst :pointer)
               (src :pointer))
 
-(cffi:defcenum (ai-primitive-type :unsigned-int)
+(cffi:defcenum (ai-primitive-type :unsigned-int) ;; 3.0+
   (:ai-primitive-type-point 1)
   (:ai-primitive-type-line 2)
   (:ai-primitive-type-triangle 4)
@@ -705,3 +808,62 @@
 ;; 3.0
 (cffi:defcfun ("aiReleasePropertyStore" ai-release-property-store) :void
   (p :pointer))
+
+;; 3.1+
+(cl:when (%v= :3.1+)
+  (cffi:defcfun ("aiSetImportPropertyMatrix" ai-set-import-property-matrix)
+      :void
+    (store :pointer)
+    (sz-name :string)
+    (mat (:pointer (:struct ai-matrix-4x-4))))
+
+  (cffi:defcfun ("aiGetMaterialUVTransform" ai-get-material-uv-transform)
+      ai-return
+    (p-mat (:pointer (:struct ai-material)))
+    (p-key :string)
+    (type :unsigned-int)
+    (index :unsigned-int)
+    (p-out (:pointer (:struct ai-uv-transform)))))
+
+;; 3.2+
+(cl:when (%v= :3.2+)
+
+ (cffi:defbitfield ai-importer-flags ;; 3.2+
+   (:text 1)
+   (:binary 2)
+   (:compressed 4)
+   (:limited-support 8)
+   (:experimental #x10))
+
+ (cffi:defcstruct ai-importer-desc ;; 3.2+
+   (m-name :string)
+   (m-author :string)
+   (m-maintainer :string)
+   (m-comments :string)
+   (m-flags ai-importer-flags)
+   (m-min-major :unsigned-int)
+   (m-min-minor :unsigned-int)
+   (m-max-major :unsigned-int)
+   (m-max-minor :unsigned-int)
+   (m-file-extensions :string))
+
+ (cffi:defcfun ("aiGetImportFormatCount" ai-get-import-format-count) size-t)
+
+ (cffi:defcfun ("aiGetImportFormatDescription" ai-get-import-format-description)
+     (:pointer (:struct ai-importer-desc))
+   (p-index size-t))
+
+ (cffi:defcfun ("aiGetImporterDesc" ai-get-importer-description)
+     (:pointer (:struct ai-importer-desc))
+   (extension :string)))
+
+;; todo: export support
+;; aiCopyScene
+;; aiExportScene
+;; aiExportSceneEx
+;; aiExportSceneToBlob
+;; aiFreeScene
+;; aiGetExportFormatCount
+;; aiGetExportFormatDescription
+;; aiReleaseExportBlob
+;; aiReleaseExportFormatDescription

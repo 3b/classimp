@@ -342,5 +342,21 @@
            #:z
            #:ai-import-file-ex-with-properties
            #:ai-create-property-store
-           #:ai-release-property-store))
+           #:ai-release-property-store
+           #:ai-import-file-from-memory-with-properties
+           #:ai-get-import-format-description
+           #:ai-get-import-format-count
+           #:ai-importer-desc
+           #:ai-importer-flags
+           #:m-author
+           #:m-maintainer
+           #:m-comments
+           #:m-min-major
+           #:m-min-minor
+           #:m-max-major
+           #:m-max-minor
+           #:m-file-extensions
+           #:ai-get-importer-description
+           #:ai-get-material-uv-transform
+           #:ai-set-import-property-matrix))
 
