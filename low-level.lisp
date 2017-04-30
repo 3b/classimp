@@ -559,7 +559,7 @@
 ;; typedef size_t (*aiFileTellProc) (C_STRUCT aiFile*);
 (cffi::defctype ai-file-tell-proc :pointer)
 
-(cffi:defcenum (ai-component :unsigned-int) ;; 3.0+
+(cffi:defbitfield (ai-component :unsigned-int) ;; 3.0+
   (:ai-component-normals 2)
   (:ai-component-tangents-and-bitangents 4)
   (:ai-component-colors 8)
@@ -773,7 +773,7 @@
 (cffi:defcfun ("aiMultiplyMatrix4" ai-multiply-matrix-4) :void (dst :pointer)
               (src :pointer))
 
-(cffi:defcenum (ai-primitive-type :unsigned-int) ;; 3.0+
+(cffi:defbitfield (ai-primitive-type :unsigned-int) ;; 3.0+
   (:ai-primitive-type-point 1)
   (:ai-primitive-type-line 2)
   (:ai-primitive-type-triangle 4)
