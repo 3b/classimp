@@ -574,15 +574,27 @@
   ;; probably should get rid of long-name versions?
   (:normals 2)
   (:tangents-and-bitangents 4)
-  (:colors 8)
-  (:texcoords #x10)
+  (:colors 8) ;; all color channels
+  (:texcoords #x10) ;; all UV channels
   (:boneweights #x20)
   (:animations #x40)
   (:textures #x80)
   (:lights #x100)
   (:cameras #x200)
   (:meshes #x400)
-  (:materials #x800))
+  (:materials #x800)
+  ;; #define aiComponent_COLORSn(n) (1u << (n+20u))
+  (:color0 #x200000)
+  (:color1 #x400000)
+  (:color2 #x800000)
+  (:color3 #x1000000)
+  (:color4 #x2000000)
+  ;; #define aiComponent_TEXCOORDSn(n) (1u << (n+25u))
+  (:texcoord0 #x4000000)
+  (:texcoord1 #x8000000)
+  (:texcoord2 #x10000000)
+  (:texcoord3 #x20000000)
+  (:texcoord4 #x40000000))
 
 ;; typedef struct aiFile* (*aiFileOpenProc) (struct aiFileIO*, const char*, const char*);
 (cffi::defctype ai-file-open-proc :pointer)
