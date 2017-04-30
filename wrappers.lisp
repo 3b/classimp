@@ -716,6 +716,7 @@
   `(progn ,@body))
 
 (defun import-into-lisp (filename &key processing-flags raw-times properties)
+  ;; see config.lisp for PROPERTIES values/usage
   (check-version)
   (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
     (prog1

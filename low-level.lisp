@@ -869,6 +869,17 @@
      (:pointer (:struct ai-importer-desc))
    (extension :string)))
 
+;; used by properties
+(cffi:defbitfield ai-uvtrafo
+  (:scaling 1)
+  (:rotation 2)
+  (:translation 4)
+  (:scale 1)
+  (:rotate 2)
+  (:translate 4))
+
+
+
 ;; todo: export support
 ;; aiCopyScene
 ;; aiExportScene
