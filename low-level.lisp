@@ -1,10 +1,11 @@
 (cl:in-package :%open-asset-import-library)
 
-(cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
-(cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
-
 ;; try to determine library version at compile/load time
 (cl:eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
+  (cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
+
   (cl:defvar *version* :unknown)
   (cl:defvar *compiled* ())
   (cl:defun get-version-keyword ()
@@ -237,24 +238,24 @@
   (d-3 :float)
   (d-4 :float))
 
-(cl:when (%v= :3.1+)
-  (cffi:defcenum (ai-metadata-type :int) ;; 3.1+
-    (:bool 0)
-    (:int 1)
-    (:uint64 2)
-    (:float 3)
-    (:double 4)
-    (:ai-string 5)
-    (:ai-vector-3d 6))
 
-  (cffi:defcstruct ai-metadata-entry ;; 3.1+
-    (m-type ai-metadata-type)
-    (data (:pointer :void)))
+(cffi:defcenum (ai-metadata-type :int) ;; 3.1+
+  (:bool 0)
+  (:int 1)
+  (:uint64 2)
+  (:float 3)
+  (:double 4)
+  (:ai-string 5)
+  (:ai-vector-3d 6))
 
-  (cffi:defcstruct ai-metadata ;; 3.1+
-    (m-num-properties :unsigned-int)
-    (m-keys (:pointer (:struct ai-string)))
-    (m-values (:pointer (:struct ai-metadata-entry)))))
+(cffi:defcstruct ai-metadata-entry ;; 3.1+
+  (m-type ai-metadata-type)
+  (data (:pointer :void)))
+
+(cffi:defcstruct ai-metadata ;; 3.1+
+  (m-num-properties :unsigned-int)
+  (m-keys (:pointer (:struct ai-string)))
+  (m-values (:pointer (:struct ai-metadata-entry))))
 
 (defcstruct/v ai-node ;; 3.0+
   (m-name (:struct ai-string))
@@ -822,52 +823,49 @@
   (p :pointer))
 
 ;; 3.1+
-(cl:when (%v= :3.1+)
-  (cffi:defcfun ("aiSetImportPropertyMatrix" ai-set-import-property-matrix)
-      :void
-    (store :pointer)
-    (sz-name :string)
-    (mat (:pointer (:struct ai-matrix-4x-4))))
+(cffi:defcfun ("aiSetImportPropertyMatrix" ai-set-import-property-matrix)
+    :void
+  (store :pointer)
+  (sz-name :string)
+  (mat (:pointer (:struct ai-matrix-4x-4))))
 
-  (cffi:defcfun ("aiGetMaterialUVTransform" ai-get-material-uv-transform)
-      ai-return
-    (p-mat (:pointer (:struct ai-material)))
-    (p-key :string)
-    (type :unsigned-int)
-    (index :unsigned-int)
-    (p-out (:pointer (:struct ai-uv-transform)))))
+(cffi:defcfun ("aiGetMaterialUVTransform" ai-get-material-uv-transform)
+    ai-return
+  (p-mat (:pointer (:struct ai-material)))
+  (p-key :string)
+  (type :unsigned-int)
+  (index :unsigned-int)
+  (p-out (:pointer (:struct ai-uv-transform))))
 
 ;; 3.2+
-(cl:when (%v= :3.2+)
+(cffi:defbitfield ai-importer-flags ;; 3.2+
+  (:text 1)
+  (:binary 2)
+  (:compressed 4)
+  (:limited-support 8)
+  (:experimental #x10))
 
- (cffi:defbitfield ai-importer-flags ;; 3.2+
-   (:text 1)
-   (:binary 2)
-   (:compressed 4)
-   (:limited-support 8)
-   (:experimental #x10))
+(cffi:defcstruct ai-importer-desc ;; 3.2+
+  (m-name :string)
+  (m-author :string)
+  (m-maintainer :string)
+  (m-comments :string)
+  (m-flags ai-importer-flags)
+  (m-min-major :unsigned-int)
+  (m-min-minor :unsigned-int)
+  (m-max-major :unsigned-int)
+  (m-max-minor :unsigned-int)
+  (m-file-extensions :string))
 
- (cffi:defcstruct ai-importer-desc ;; 3.2+
-   (m-name :string)
-   (m-author :string)
-   (m-maintainer :string)
-   (m-comments :string)
-   (m-flags ai-importer-flags)
-   (m-min-major :unsigned-int)
-   (m-min-minor :unsigned-int)
-   (m-max-major :unsigned-int)
-   (m-max-minor :unsigned-int)
-   (m-file-extensions :string))
+(cffi:defcfun ("aiGetImportFormatCount" ai-get-import-format-count) size-t)
 
- (cffi:defcfun ("aiGetImportFormatCount" ai-get-import-format-count) size-t)
+(cffi:defcfun ("aiGetImportFormatDescription" ai-get-import-format-description)
+    (:pointer (:struct ai-importer-desc))
+  (p-index size-t))
 
- (cffi:defcfun ("aiGetImportFormatDescription" ai-get-import-format-description)
-     (:pointer (:struct ai-importer-desc))
-   (p-index size-t))
-
- (cffi:defcfun ("aiGetImporterDesc" ai-get-importer-description)
-     (:pointer (:struct ai-importer-desc))
-   (extension :string)))
+(cffi:defcfun ("aiGetImporterDesc" ai-get-importer-description)
+    (:pointer (:struct ai-importer-desc))
+  (extension :string))
 
 ;; used by properties
 (cffi:defbitfield ai-uvtrafo
