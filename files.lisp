@@ -30,8 +30,10 @@
                                                   *ignore-files* :test 'equalp)
                                     (pushnew (pathname-type f)
                                             unknown :test 'equalp)))
-                                (member (pathname-type f)
-                                        *extensions* :test 'equalp)))
+                                (unless (member (pathname-type f)
+                                                  *ignore-files* :test 'equalp)
+                                  (member (pathname-type f)
+                                         *extensions* :test 'equalp))))
     (when foo (setf *file-list* foo))
     (format t "unknown extensions ~s~%" unknown)))
 

@@ -1,7 +1,7 @@
 (in-package #:classimp)
 
-;;; PROPERTIES argument to importer should be a list like
-#++ '(:pp-sbp-remove :point :line)
+;;; PROPERTIES argument to importer should be a plist like
+;;  '(:pp-sbp-remove (:point :line))
 ;;; which configures the :ai-process-sort-by-p-type postprocess step
 ;;; to remove meshes with :line or :point primitives
 
