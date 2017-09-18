@@ -662,7 +662,7 @@
   (flush-proc ai-file-flush-proc)
   (user-data ai-user-data))
 
-(cffi:defcfun ("aiGetErrorString" ai-get-error-string) :pointer)
+(cffi:defcfun ("aiGetErrorString" ai-get-error-string) :string)
 
 (cffi:defcfun ("aiDecomposeMatrix" ai-decompose-matrix) :void
   (mat (:pointer (:struct ai-matrix-4x-4)))
