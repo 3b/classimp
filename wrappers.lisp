@@ -674,7 +674,7 @@
 
 (defun check-version ()
   (let* ((major (%ai:ai-get-version-major))
-         (minor (%ai:ai-get-version-major))
+         (minor (%ai:ai-get-version-minor))
          (version (intern (format () "~a.~a" major minor) :keyword)))
     (unless (eql version %ai::*version*)
       (cerror "try using it anyway"
