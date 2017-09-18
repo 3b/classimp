@@ -812,8 +812,9 @@
   (declare (ignore r))
   ;; fixme: error checking...
   (let ((log (gensym)))
-    `(cffi:with-foreign-object (,log '%ai:ai-log-stream)
-       (setf (cffi:foreign-slot-value ,log '%ai:ai-log-stream '%ai:callback)
+    `(cffi:with-foreign-object (,log '(:struct %ai:ai-log-stream))
+       (setf (cffi:foreign-slot-value ,log '(:struct %ai:ai-log-stream)
+                                      '%ai:callback)
              (cffi:callback log-to-*standard-output*))
        #-classimp-broken-logging
        (%ai:ai-attach-log-stream ,log)
