@@ -1,5 +1,18 @@
 (in-package #:classimp)
 
+;; try to notice is someone recompiled low-level with restart due to
+;; shared lib version mismatch and this didn't get recompiled
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *wrapper-version* #.%ai::*version*)
+  (eval-when (:compile-toplevel)
+    (setf *wrapper-version* %ai::*version*))
+  (eval-when (:load-toplevel :execute)
+    (unless (eql *wrapper-version* %ai::*version*)
+      (error "classimp wrappers and bindings were compiled with ~
+              different version of assimp?~%~
+              wrappers = ~a, bindings =  ~a"
+             *wrapper-version* %ai::*version*))))
+
 (defparameter *loader-default-animation-ticks-per-second* 24.0)
 (defparameter *loader-translate-times* t)
 (defparameter *translate-verbose* nil)

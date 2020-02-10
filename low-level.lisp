@@ -6,14 +6,19 @@
   (cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
   (cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
 
-  (cl:defvar *version* :unknown)
-  (cl:defvar *compiled* ())
+
+  (cl:defvar *version*)
+  (cl:defvar *compiled*)
+  (cl:defvar %version% :unknown)
+  (cl:defvar %compiled% (cl:and #.cl:*compile-file-pathname* cl:t))
+
   (cl:defun get-version-keyword ()
     (cl:let* ((major (cl:ignore-errors (ai-get-version-major)))
               (minor (cl:ignore-errors (ai-get-version-minor)))
               (new-version (cl:intern
                             (cl:format () "~a.~a" major minor) :keyword)))
       (cl:values new-version major minor)))
+
   (cl:defun %v= (req)
     (cl:ecase req
       (:3.0-3.3 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3))) ;; exact versions
@@ -28,7 +33,7 @@
       (:5.0+ (cl:member *version* '(:5.0))))))
 
 (cl:eval-when (:compile-toplevel)
-  (cl:setf *compiled* cl:t)
+  (cl:setf %compiled% cl:t)
   (cl:when (cffi:foreign-library-loaded-p 'assimp)
     ;; try to check version of C library
     (cl:multiple-value-bind (new-version major minor)
@@ -38,10 +43,14 @@
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
                      (5 (cl:= minor 0))
-                     (t nil))
+                     (cl:t ()))
           (cl:error "trying to link against unsupported version of assimp. 3.0-5.0.x supported, got version ~a.~a"
                     major minor))
-        (cl:setf *version* new-version)))))
+        (cl:setf %version% new-version)))))
+
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+  (cl:setf *version* #.%version%
+           *compiled* #.%compiled%))
 
 (cl:eval-when (:load-toplevel :execute)
   (cl:when (cffi:foreign-library-loaded-p 'assimp)
@@ -52,7 +61,7 @@
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
                      (5 (cl:= minor 0))
-                     (t nil))
+                     (cl:t ()))
           (cl:error "trying to link against unsupported version of assimp. 3.0-5.0.x supported, got version ~a.~a"
                     major minor))
         (cl:cond
