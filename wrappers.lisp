@@ -23,7 +23,9 @@
    (animations :initarg animations :accessor animations :initform nil)
    (textures :initarg textures :accessor textures :initform nil)
    (lights :initarg lights :accessor lights :initform nil)
-   (cameras :initarg cameras :accessor cameras :initform nil)))
+   (cameras :initarg cameras :accessor cameras :initform nil)
+   ;; 5.0+
+   (metadata :initarg metadata :accessor metadata :initform nil)))
 
 ;; todo: do these need writers?
 (defmethod scene-incomplete-p ((scene scene))
@@ -36,6 +38,8 @@
   (logbitp 3 (%flags scene)))
 (defmethod scene-terrain-p ((scene scene))
   (logbitp 4 (%flags scene)))
+(defmethod scene-allow-shared-p ((scene scene))
+  (logbitp 5 (%flags scene)))
 
 
 
