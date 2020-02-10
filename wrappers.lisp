@@ -513,6 +513,13 @@
     (let ((key (translate-ai-string %ai:m-key)))
       (labels ((k= (s) (string= key s))
                (single-value (type)
+                 ;; work around bug in ai gltf importer
+                 (when (and (eql *wrapper-version* :|5.0|)
+                            (= %ai:m-data-length 1)
+                            (eql type :uint)
+                            (eql %ai:m-type :ai-pti-buffer))
+                   (return-from single-value
+                     (cffi:mem-ref %ai:m-data :uint8)))
                  (assert (= %ai:m-data-length 4))
                  (cffi:mem-aref %ai:m-data type))
                (keyword (name type)
