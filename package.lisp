@@ -61,4 +61,5 @@
            #:pre-state
            #:post-state
            #:import-into-lisp/string
-           #:import-into-lisp/memory))
+           #:import-into-lisp/memory
+           #:get-extension-list))

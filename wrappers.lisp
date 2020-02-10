@@ -828,4 +828,17 @@
          #-classimp-broken-logging
          (%ai:ai-detach-log-stream ,log)))))
 
+(defun get-extension-list ()
+  (cffi:with-foreign-object (p '(:struct %ai:ai-string))
+  (%ai::ai-get-extension-list p)
+  #++(cffi:mem-ref (cffi:mem-ref p :pointer)
+                :string 4)
+    (loop for a in (split-sequence:split-sequence
+                    #\;
+                    (cffi:foreign-string-to-lisp
+                     (cffi:foreign-slot-pointer p '(:struct %ai::ai-string)
+                                                '%ai::data)))
+          when (= 2 (mismatch a "*."))
+            collect (subseq a 2)
+          else collect (list a (mismatch a "*.")))))
 ;; todo: more loggers, file etc...

@@ -5,7 +5,8 @@
 
 ;; fixme: figure out actual supported extension list...
 (defparameter *extensions*
-  '("x" "X" "WRL" "ter" "max" "STL" "smd" "raw" "q3s" "q3o" "ply"
+  (ai:get-extension-list)
+  #++'("x" "X" "WRL" "ter" "max" "STL" "smd" "raw" "q3s" "q3o" "ply"
     "off" "mtl" "obj" "mat" "nff" "mdl"
     "md5mesh"
     "md3" "md2"
@@ -15,6 +16,8 @@
     "3ds"
     "3d" "uc"))
 
+(defparameter *ignore-path-components* '("invalid"))
+
 (defparameter *ignore-files* '("tga" "svn-base"  "jpg" "txt"  "png" "bmp"
                                "blend" "shader"  "lws" "rtf"
                                "md5anim""material" nil))
@@ -22,18 +25,25 @@
 (defun find-files (path)
   (let ((foo nil)
         (unknown nil))
-    (fad:walk-directory path (lambda (a) (push a foo))
-                        :test (lambda (f)
-                                (unless (member (pathname-type f)
-                                                *extensions* :test 'equalp)
-                                  (unless (member (pathname-type f)
-                                                  *ignore-files* :test 'equalp)
-                                    (pushnew (pathname-type f)
-                                            unknown :test 'equalp)))
-                                (unless (member (pathname-type f)
-                                                  *ignore-files* :test 'equalp)
-                                  (member (pathname-type f)
-                                         *extensions* :test 'equalp))))
+    (fad:walk-directory
+     path (lambda (a) (push a foo))
+     :test (lambda (f)
+             (unless (member (pathname-type f)
+                             *extensions* :test 'equalp)
+               (unless (member (pathname-type f)
+                               *ignore-files* :test 'equalp)
+                 (pushnew (pathname-type f)
+                          unknown :test 'equalp)))
+             (unless (or (member (pathname-type f)
+                                 *ignore-files* :test 'equalp)
+                         (loop
+                           for p in (pathname-directory
+                                     (enough-namestring
+                                      f path))
+                             thereis (member p *ignore-path-components*
+                                             :test 'equalp)))
+               (member (pathname-type f)
+                       *extensions* :test 'equalp))))
     (when foo (setf *file-list* foo))
     (format t "unknown extensions ~s~%" unknown)))
 
