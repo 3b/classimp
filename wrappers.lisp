@@ -211,31 +211,31 @@
               (translate-ai-string %ai:m-name)
               %ai:m-num-children %ai:m-num-meshes))
     (let ((new
-           (make-instance
-            'node
-            'name (translate-ai-string %ai:m-name)
-            'transform (translate-ai-matrix-4x4 %ai:m-transformation)
-            ;; we replace this later, since we might not have created parent yet
-            'parent (unless (cffi:null-pointer-p %ai:m-parent) %ai:m-parent)
-            'children (remove
-                       nil
-                       (make-array
-                        %ai:m-num-children
-                        :initial-contents
-                        (loop for i below %ai:m-num-children
-                              collect (translate-ai-node
-                                       (cffi:mem-aref %ai:m-children :pointer i)))))
-            'meshes (make-array %ai:m-num-meshes
-                                :element-type '(unsigned-byte 32)
-                                :initial-contents
-                                (loop for i below %ai:m-num-meshes
-                                   collect (cffi:mem-aref %ai:m-meshes
-                                                          :unsigned-int i))))))
+            (make-instance
+             'node
+             'name (translate-ai-string %ai:m-name)
+             'transform (translate-ai-matrix-4x4 %ai:m-transformation)
+             ;; we replace this later, since we might not have created parent yet
+             'parent (unless (cffi:null-pointer-p %ai:m-parent) %ai:m-parent)
+             'children (remove
+                        nil
+                        (make-array
+                         %ai:m-num-children
+                         :initial-contents
+                         (loop for i below %ai:m-num-children
+                               collect (translate-ai-node
+                                        (cffi:mem-aref %ai:m-children :pointer i)))))
+             'meshes (make-array %ai:m-num-meshes
+                                 :element-type '(unsigned-byte 32)
+                                 :initial-contents
+                                 (loop for i below %ai:m-num-meshes
+                                       collect (cffi:mem-aref %ai:m-meshes
+                                                              :unsigned-int i))))))
       (loop for c across (children new)
-         when (cffi:pointer-eq node (parent c))
-         do (setf (parent c) new)
-         else do (error "parent of child not = current node? ~s /= ~s"
-                        node (parent c)))
+            when (cffi:pointer-eq node (parent c))
+              do (setf (parent c) new)
+            else do (error "parent of child not = current node? ~s /= ~s"
+                           node (parent c)))
       new)))
 
 (defmacro translate-ai-array (translator count source
