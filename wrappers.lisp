@@ -763,6 +763,9 @@
                               (namestring filename) flags
                               (cffi:null-pointer) store))
                            (%ai:ai-import-file (namestring filename) flags))))
+               (when (and (cffi:null-pointer-p raw-scene)
+                          *translate-verbose*)
+                 (format t "  import failed: ~s~%" (%ai:ai-get-error-string)))
                (unless (cffi:null-pointer-p raw-scene)
                  (when *translate-verbose*
                    (format t "  translate-scene~%"))
