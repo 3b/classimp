@@ -178,6 +178,8 @@
       ""))
 
 (defun translate-ai-string (str)
+  (when (null-pointer-p str)
+    (return-from translate-ai-string nil))
   (with-foreign-slots* ((%ai:length (:pointer %ai:data)) str 
                         (:struct %ai:ai-string))
     (decode-string %ai:data %ai:length)))
@@ -197,6 +199,8 @@
 
 (defun translate-ai-node (node)
   ;; (print (cffi:foreign-slot-value node '(:struct %ai:ai-node) '%ai:m-num-meshes))
+  (when (null-pointer-p node)
+    (return-from translate-ai-node nil))
   (with-foreign-slots* (((:pointer %ai:m-name)
                          (:pointer %ai:m-transformation) %ai:m-parent
                          %ai:m-num-children %ai:m-children
@@ -213,12 +217,14 @@
             'transform (translate-ai-matrix-4x4 %ai:m-transformation)
             ;; we replace this later, since we might not have created parent yet
             'parent (unless (cffi:null-pointer-p %ai:m-parent) %ai:m-parent)
-            'children (make-array
-                       %ai:m-num-children
-                       :initial-contents
-                       (loop for i below %ai:m-num-children
-                          collect (translate-ai-node
-                                   (cffi:mem-aref %ai:m-children :pointer i))))
+            'children (remove
+                       nil
+                       (make-array
+                        %ai:m-num-children
+                        :initial-contents
+                        (loop for i below %ai:m-num-children
+                              collect (translate-ai-node
+                                       (cffi:mem-aref %ai:m-children :pointer i)))))
             'meshes (make-array %ai:m-num-meshes
                                 :element-type '(unsigned-byte 32)
                                 :initial-contents
