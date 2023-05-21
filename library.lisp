@@ -4,6 +4,7 @@
   (:darwin "libassimp.dylib")
   (:windows (:or "assimp.dll"
                  "libassimp.dll"
+                 "libassimp-5.dll"
                  ;; locally built assimp has lots of dll names
                  ;; depending on what version of VC it was compiled
                  ;; with :/ please send a pr or bug report if you see
