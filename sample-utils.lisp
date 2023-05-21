@@ -109,7 +109,8 @@
 
 (defparameter *filename* nil)
 (defun unload-textures (window)
-  (when (and window (scene window))
+  (when (and window (scene window)
+             (ai:materials (scene window)))
     (format t "  cleaning up materials~%")
     (loop for i across (ai:materials (scene window))
        for tex.file = (gethash "$tex.file" i)
@@ -122,82 +123,144 @@
 
 (defun reload-textures (window &optional (clean-up t))
   (when clean-up (unload-textures window))
-  (loop for i across (ai:materials (scene window))
-     for tex.file = (gethash "$tex.file" i)
-     do (loop for tf in tex.file
-           for (semantic index file) = tf
-           if (and (plusp (length file))
-                   (char= #\* (char file 0))) ;; embedded file
+  (unless (ai:materials (scene window))
+    (return-from reload-textures nil))
+  (loop
+    for i across (ai:materials (scene window))
+    for tex.file = (gethash "$tex.file" i)
+    do (loop
+         for tf in tex.file
+         for (semantic index file) = tf
+         if (and (plusp (length file))
+                 (char= #\* (char file 0))) ;; embedded file
            do (let ((tex-index (parse-integer (subseq file 1) :junk-allowed t)))
                 (if (or (not tex-index) (not (numberp tex-index))
                         (minusp tex-index)
                         (>= tex-index (length (ai:textures (scene window)))))
                     (format t "bad embedded texture index ~s (~s)~%"
                             tex-index (subseq file 1))
-                    (destructuring-bind (type w h data &optional format-hint)
-                        (aref (ai:textures (scene window)) tex-index )
-                      (declare (ignorable format-hint))
-                      (if (eq type :bgra)
-                          (let ((name (car (gl:gen-textures 1))))
-                            (format t "load embedded texture ~s x ~s~%" w h)
-                            (gl:bind-texture :texture-2d name)
-                            (gl:tex-parameter :texture-2d :texture-min-filter
-                                              :linear)
-                            (gl:tex-parameter :texture-2d :generate-mipmap t)
-                            (gl:tex-parameter :texture-2d :texture-min-filter
-                                              :linear-mipmap-linear)
-                            (gl:tex-image-2d :texture-2d 0 :rgba w h
-                                             0 :bgra :unsigned-byte
-                                             data)
-                            (setf (getf (cdddr tf) :texture-name) name))
-                          (let ((iname (il:gen-image))
-                                (result nil))
-                            (il:with-bound-image iname
-                              (cffi:with-pointer-to-vector-data (p data)
-                                (il:load-l :unknown p (length data) ))
-                              (setf result (ilut:gl-bind-tex-image)))
-                            (il:delete-images (list iname))
-                            (setf (getf (cdddr tf) :texture-name) result))))
-))
-           else if (find #\* file) ;; texture name with * in it?
-           do (format t "bad texture name ~s~%" file)
-           else ;; external texture
-           do (let* ((cleaned (substitute
-                               #\/ #\\
-                               (string-trim #(#\space #\Newline
-                                              #\Return #\tab) file)))
-                     (final-path cleaned))
-                ;; some model formats store absolute paths, so
-                ;; let's try chopping dirs off the front if we
-                ;; can't find it directly
-                (loop named outer
-                   with (car . d) = (pathname-directory (truename *filename*))
-                   for base on (reverse d)
-                   for base-path = (make-pathname :directory (cons car (reverse base)))
-                   ;;do (format t "base dir ~s~%" base-path)
-                   when (probe-file (merge-pathnames cleaned base-path))
-                   return  (setf final-path
-                                 (cffi-sys:native-namestring
-                                  (merge-pathnames cleaned base-path)))
-                   do (flet ((relative (f)
-                               (cffi-sys:native-namestring
-                                (merge-pathnames f base-path))))
-                        (loop for offset = 0 then (position #\/ cleaned :start (1+ offset))
-                           while offset
-                           when (probe-file (relative (subseq cleaned (1+ offset))))
-                           do (return-from outer (setf final-path (relative (subseq cleaned (1+ offset))))))))
+                    (destructuring-bind (type &key width height format filename data)
+                        (aref (ai:textures (scene window)) tex-index)
+                      (declare (ignorable format filename))
+                      (ecase type
+                        (:uncompressed-texture
+                         (let ((name (print (gl:gen-texture))))
+                           (format t "load embedded texture ~s x ~s (~s)~%"
+                                   width height format)
+                           (gl:bind-texture :texture-2d name)
+                           (gl:tex-parameter :texture-2d :texture-mag-filter
+                                             :linear)
+                           (gl:tex-parameter :texture-2d :generate-mipmap t)
+                           (gl:tex-parameter :texture-2d :texture-min-filter
+                                             :linear-mipmap-linear)
+                           (gl:tex-image-2d :texture-2d 0 :rgba width height
+                                            0 :bgra :unsigned-byte
+                                            data)
+                           (gl:generate-mipmap :texture-2d)
+                           (setf (getf (cdddr tf) :texture-name) name)))
+                        (:compressed-texture
+                         (let ((iname (il:gen-image))
+                               (result nil))
+                           (format t "load embedded compressed texture ~s x ~s (~s . ~s)~%"
+                                   width height filename format)
+                           (il:with-bound-image iname
+                             (cffi:with-pointer-to-vector-data (p data)
+                               (il:load-l :unknown p (length data)))
+                             (setf result (ilut:gl-bind-tex-image)))
+                           (il:delete-images iname)
+                           (setf (getf (cdddr tf) :texture-name) result)))))))
+         else if (find #\* file) ;; texture name with * in it?
+                do (format t "bad texture name ~s~%" file)
+         else ;; external texture
+         do (let* ((cleaned (substitute
+                             #\/ #\\
+                             (string-trim #(#\space #\Newline
+                                            #\Return #\tab) file)))
+                   (final-path cleaned))
+              ;; some model formats store absolute paths, so
+              ;; let's try chopping dirs off the front if we
+              ;; can't find it directly
+              (loop named outer
+                    with (car . d) = (pathname-directory (truename *filename*))
+                    for base on (reverse d)
+                    for base-path = (make-pathname :directory (cons car (reverse base)))
+                    ;;do (format t "base dir ~s~%" base-path)
+                    when (probe-file (merge-pathnames cleaned base-path))
+                      return  (setf final-path
+                                    (cffi-sys:native-namestring
+                                     (merge-pathnames cleaned base-path)))
+                    do (flet ((relative (f)
+                                (cffi-sys:native-namestring
+                                 (merge-pathnames f base-path))))
+                         (loop for offset = 0 then (position #\/ cleaned :start (1+ offset))
+                               while offset
+                               when (probe-file (relative (subseq cleaned (1+ offset))))
+                                 do (return-from outer (setf final-path (relative (subseq cleaned (1+ offset))))))))
+              ;; some collada files with MI_CH_*_Cine_* have separate textures
+              ;; as TX_CH_*_[DNSA]_*.tga
+              (block skip
+                (when (and (not (probe-file final-path))
+                           (alexandria:starts-with-subseq "/MI_CH_" final-path)
+                           (search "_Cine_" final-path))
+                  (format t "MI_CH: ~s~%" tf)
+                  (format t "tf = ~s~%" tex.file)
+                  (loop with base-path =  (truename *filename*)
+                        with cine = (search "_Cine_" final-path)
+                        for ch across "DNSA"
+                        for type in '(:ai-texture-type-diffuse
+                                      :ai-texture-type-normals
+                                      :ai-texture-type-specular
+                                      :ai-texture-type-ambient)
+                        for fn = (format nil "TX_CH_~a_~c_~a.tga"
+                                         (subseq final-path 7 cine)
+                                         ch
+                                         (subseq final-path (+ cine 6)))
+                        for tn = (probe-file (merge-pathnames fn base-path))
+                        when tn
+                          collect (list type (second tex.file)
+                                        tn
+                                        :texture-name
+                                        (ilut:gl-load-image (namestring tn)))
+                            into new-tex.file
+                        finally (setf (gethash "$tex.file" i)
+                                      new-tex.file))
+                  (return-from skip))
                 (format t "load texture file ~s from ~s~%" file
-                        final-path)
-                (setf (getf (cdddr tf) :texture-name)
-                      (ilut:gl-load-image final-path))))))
+                        final-path))
+              (setf (getf (cdddr tf) :texture-name)
+                    (ilut:gl-load-image final-path))))))
 
 (defun reload-scene (&optional window)
   (when *filename*
     (format t "reload scene -> ~s~%" *filename*)
+    (%ai::ai-enable-verbose-logging 1)
     (let ((s (ai:import-into-lisp
               (cffi-sys:native-namestring (truename *filename*))
-              :processing-flags '(:ai-process-validate-data-structure
-                                  :ai-process-preset-target-realtime-quality))))
+              :processing-flags
+              #++'(:ai-process-validate-data-structure
+                :ai-process-preset-target-realtime-quality)
+              '(:ai-process-improve-cache-locality
+                :ai-process-limit-bone-weights
+                :ai-process-split-large-meshes
+                :ai-process-join-identical-vertices
+                :ai-process-calc-tangent-space
+                :ai-process-gen-normals
+                :ai-process-split-by-bone-count
+                :ai-process-find-invalid-data
+                :ai-process-sort-by-p-type
+                :ai-process-find-degenerates
+                :ai-process-triangulate
+                :ai-process-transform-uv-coords
+                :ai-process-gen-uv-coords
+                :ai-process-optimize-graph
+                :ai-process-find-instances
+                :ai-process-remove-redundant-materials
+                :ai-process-flip-winding-order
+                :ai-process-flip-u-vs
+                :ai-process-make-left-handed
+                :ai-process-validate-data-structure
+                :ai-process-gen-bounding-boxes
+                ))))
       (when (and window s)
         (unload-textures window)
         (setf (scene window) s)

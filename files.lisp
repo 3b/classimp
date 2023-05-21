@@ -54,7 +54,8 @@
     (when (minusp *file-index*) (setf *file-index* 0))
     (setf *filename* (elt *file-list* *file-index*))
     (format t "load next file (~s) = ~s~%" *file-index* *filename*)
-    (reload-scene w)))
+    (reload-scene w)
+    (format t "~a/~a~%" *file-index* (length *file-list*))))
 
 
 ;(find-files (merge-pathnames "src/assimp/test/models" (user-homedir-pathname)))
