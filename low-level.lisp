@@ -1,84 +1,207 @@
 (cl:in-package :%open-asset-import-library)
 
+;;; todo: add option to set a minimum version
+;; for users that don't want to build against a specific binary, or
+;; who want to error if built against one with too low version, add an
+;; option to set a version directly
+
+
 ;; try to determine library version at compile/load time
 (cl:eval-when (:compile-toplevel :load-toplevel :execute)
 
   (cffi:defcfun ("aiGetVersionMajor" ai-get-version-major) :unsigned-int)
   (cffi:defcfun ("aiGetVersionMinor" ai-get-version-minor) :unsigned-int)
+  ;; 5.1.0
+  (cffi:defcfun ("aiGetVersionPatch" ai-get-version-patch) :unsigned-int)
+
+  ;; ai-get-compile-flags has existed for a while returning an int,
+  ;; and cffi bitfields are annoying anyway, so just define constants
+  ;; for use with logtest
+  (cl:defconstant assimp-cflags-shared #x01)
+  (cl:defconstant assimp-cflags-stlport #x02)
+  (cl:defconstant assimp-cflags-debug #x04)
+  (cl:defconstant assimp-cflags-noboost #x08)
+  (cl:defconstant assimp-cflags-single-threaded #x10)
+  ;; 5.1.0+
+  (cl:defconstant assimp-cflags-double-support #x20)
+  (cffi:defcfun ("aiGetCompileFlags" ai-get-compile-flags) :unsigned-int)
+  ;; bitfields are nicer for printing though, so defining it anyway :/
+  (cffi:defbitfield assimp-cflags
+    (:shared #x01)
+    (:stlport #x02)
+    (:debug #x04)
+    (:noboost #x08)
+    (:single-threaded #x10)
+    (:double-support #x20))
+
 
 
   (cl:defvar *version*)
+  (cl:defvar *cflags*)
   (cl:defvar *compiled*)
   (cl:defvar %version% :unknown)
+  (cl:defvar %cflags% ())
   (cl:defvar %compiled% (cl:and #.cl:*compile-file-pathname* cl:t))
+  ;; used for compile-time version check macros, so default to 0,0,0
+  (cl:defvar *version-major* 0)
+  (cl:defvar *version-minor* 0)
+  (cl:defvar *version-patch* 0)
+
 
   (cl:defun get-version-keyword ()
     (cl:let* ((major (cl:ignore-errors (ai-get-version-major)))
               (minor (cl:ignore-errors (ai-get-version-minor)))
+              (patch (cl:when (cl:or (cl:> major 5)
+                                     (cl:and (cl:>= major 5) (cl:>= minor 1)))
+                       (cl:ignore-errors (ai-get-version-patch))))
+              ;; not including patch in keyword since current use
+              ;; assumes :x.y. Need to rewrite tests to account for
+              ;; patch, since there are ABI/API changes at patch
+              ;; level.
               (new-version (cl:intern
                             (cl:format () "~a.~a" major minor) :keyword)))
-      (cl:values new-version major minor)))
+      (cl:values new-version major minor patch)))
 
   (cl:defun %v= (req)
     (cl:ecase req
       (:3.0-3.3 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3))) ;; exact versions
       (:3.0-4.1 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1))) ;; exact versions
-      (:3.0+ (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1 :5.0)))
-      (:3.1+ (cl:member *version* '(:3.1 :3.2 :3.3 :4.0 :4.1 :5.0)))
-      (:3.2+ (cl:member *version* '(:3.2 :3.3 :4.0 :4.1 :5.0)))
-      (:3.3+ (cl:member *version* '(:3.3 :4.0 :4.1 :5.0)))
+      (:3.0-5.0 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1 :5.0))) ;; exact versions
+      (:3.0+ (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
+      (:3.1+ (cl:member *version* '(:3.1 :3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
+      (:3.2+ (cl:member *version* '(:3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
+      (:3.3+ (cl:member *version* '(:3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
       (:>3.3 (cl:error "fix this"))
-      (:4.0+ (cl:member *version* '(:4.0 :4.1 :5.0)))
-      (:4.1+ (cl:member *version* '(:4.1 :5.0)))
-      (:5.0+ (cl:member *version* '(:5.0))))))
+      (:4.0+ (cl:member *version* '(:4.0 :4.1 :5.0 :5.1 :5.2)))
+      (:4.1+ (cl:member *version* '(:4.1 :5.0 :5.1 :5.2)))
+      (:5.0+ (cl:member *version* '(:5.0 :5.1 :5.2)))
+      (:5.1+ (cl:member *version* '(:5.1 :5.2)))
+      (:5.2+ (cl:member *version* '(:5.2)))
+      (:>5.2 ()))))
 
 (cl:eval-when (:compile-toplevel)
   (cl:setf %compiled% cl:t)
   (cl:when (cffi:foreign-library-loaded-p 'assimp)
     ;; try to check version of C library
-    (cl:multiple-value-bind (new-version major minor)
+    (cl:multiple-value-bind (new-version major minor patch)
         (get-version-keyword)
       (cl:when (cl:and major minor)
         (cl:unless (cl:case major
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
-                     (5 (cl:= minor 0))
+                     (5 (cl:<= minor 2))
                      (cl:t ()))
-          (cl:error "trying to link against unsupported version of assimp. 3.0-5.0.x supported, got version ~a.~a"
-                    major minor))
-        (cl:setf %version% new-version)))))
+          (cl:error "trying to link against unsupported version of assimp. 3.0-5.2.x supported, got version ~a.~a~@[.~a~]"
+                    major minor patch))
+        (cl:setf %version% new-version)
+        (cl:setf %cflags% (cl:when (cl:or (cl:> major 5)
+                                          (cl:and (cl:= major 5)
+                                                  (cl:>= minor 1)))
+                            (ai-get-compile-flags)))))))
 
 (cl:eval-when (:compile-toplevel :load-toplevel :execute)
   (cl:setf *version* #.%version%
-           *compiled* #.%compiled%))
+           *cflags* #.%cflags%
+           *compiled* #.%compiled%)
+  ;; relying on the version check below to make sure these are correct
+  (cl:setf *version-major* (ai-get-version-major)
+           *version-minor* (ai-get-version-minor))
+  (cl:when (cl:or (cl:> *version-major* 5)
+                  (cl:and (cl:= *version-major* 5)
+                          (cl:>= *version-minor* 1)))
+    (cl:setf *version-patch* (ai-get-version-patch))))
 
 (cl:eval-when (:load-toplevel :execute)
   (cl:when (cffi:foreign-library-loaded-p 'assimp)
-    (cl:multiple-value-bind (new-version major minor)
+    (cl:multiple-value-bind (new-version major minor patch)
         (get-version-keyword)
       (cl:when (cl:and major minor)
         (cl:unless (cl:case major
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
-                     (5 (cl:= minor 0))
+                     (5 (cl:<= minor 2))
                      (cl:t ()))
           (cl:error "trying to link against unsupported version of assimp. 3.0-5.0.x supported, got version ~a.~a"
                     major minor))
-        (cl:cond
-          ((cl:and *compiled* (cl:eql new-version *version*))
-           ;; version matches
-           )
-          ((cl:not *compiled*)
-           ;; not compiled, use current version
-           (cl:setf *version* new-version))
-          (cl:t ;; version mismatch
-           (cl:error "classimp was compiled with different version of assimp, was ~a, now ~a" *version* new-version)))))))
+        (cl:let ((cflags (cl:when (%v= :5.1+)
+                           (ai-get-compile-flags))))
+          (cl:cond
+            ((cl:and *compiled*
+                     (cl:eql new-version *version*)
+                     (cl:eql cflags *cflags*))
+             ;; version matches
+             )
+            ((cl:and *compiled* (cl:eql new-version *version*)
+                     (cl:numberp *cflags*)
+                     (cl:numberp cflags))
+             ;; version matches but cflags changed. Possibly should
+             ;; allow some limited changes? :DEBUG?
+             (cl:error "classimp was compiled against a version of assimp with different compilation flags~% was ~s~% now ~s~%"
+                       (cffi:foreign-bitfield-symbols 'assimp-cflags *cflags*)
+                       (cffi:foreign-bitfield-symbols 'assimp-cflags cflags)))
+            ((cl:and *compiled* (cl:eql new-version *version*)
+                     (cl:and (cl:not *cflags*)
+                             (cl:numberp cflags)
+                             (cl:logtest assimp-cflags-double-support cflags)))
+             ;; version matches, but we didn't have cflags and assumed
+             ;; single-float (not sure if this is actually possible?)
+             (cl:error "classimp was compiled assuming single-float, but current library was compiled with double support~% current compiler flags~s~%"
+                       (cffi:foreign-bitfield-symbols 'assimp-cflags cflags)))
+            ((cl:not *compiled*)
+             ;; not compiled, use current version
+             (cl:setf *version* new-version)
+             (cl:setf *cflags* (ai-get-compile-flags)))
+            (cl:t ;; version mismatch
+             (cl:error "classimp was compiled with different version of assimp, was ~a, now ~a~@[~% old compiler flags ~a~]~@[~% new compiler flags~]"
+                       *version* new-version
+                       (cl:when *cflags*
+                         (cffi:foreign-bitfield-symbols 'assimp-cflags
+                                                        *cflags*))
+                       (cl:when cflags
+                         (cffi:foreign-bitfield-symbols 'assimp-cflags
+                                                        cflags))))))))))
 
 
 ;; long is not always equal to size_t, long is 4 bytes on Windows 64
 #+cffi-features:x86-64 (cffi::defctype size-t :unsigned-long-long)
 #-cffi-features:x86-64 (cffi::defctype size-t :unsigned-long)
 
+(cl:defmacro v>= ((major minor cl:&optional (patch 0)) cl:&body body)
+  "compile-time version test for use in wrappers"
+  (cl:when (cl:or (cl:> *version-major* major)
+                  (cl:and (cl:= *version-major* major)
+                          (cl:or (cl:> *version-minor* minor)
+                                 (cl:and (cl:= *version-minor* minor)
+                                         (cl:>= *version-patch* patch)))))
+    `(cl:progn ,@body)))
+
+(cl:defmacro vcase (cl:&body clauses)
+  "compile-time version test for use in wrappers. clause looks like
+((major minor &optional (patch 0)) &body body). Highest matching
+clause at compile time will be used."
+  ;; each clause only specifies a min version, so order them highest
+  ;; first so we can use that to specify ranges
+  (cl:setf clauses
+           (cl:sort
+            (cl:copy-seq clauses)
+            (cl:lambda (a b)
+              (cl:setf a (cl:pop a) ;; destructure a bit
+                       b (cl:pop b))
+              (cl:or (cl:> (cl:first a) (cl:first b))
+                     (cl:and (cl:= (cl:first a) (cl:first b))
+                             (cl:or (cl:> (cl:second a) (cl:second b))
+                                    (cl:and (cl:= (cl:second a) (cl:second b))
+                                            (cl:>= (cl:or (cl:third a) 0)
+                                                   (cl:or (cl:third b) 0)))))))))
+  (cl:flet ((test (major minor patch)
+              (cl:or (cl:> *version-major* major)
+                     (cl:and (cl:= *version-major* major)
+                             (cl:or (cl:> *version-minor* minor)
+                                    (cl:and (cl:= *version-minor* minor)
+                                            (cl:>= *version-patch* patch)))))))
+    (cl:loop for ((maj min pat) . body) in clauses
+       when (test maj min (cl:or pat 0))
+         return `(cl:progn ,@body))))
 
 ;; versioned version of cffi:defstruct
 (cl:defmacro defcstruct/v (name-and-options cl:&body fields)
@@ -88,23 +211,32 @@
                      (cl:car f))
           when v?
             append (cl:loop for (v vf) on f by #'cl::cddr
-                       when (%v= v)
-                         return (cl:list vf))
+                      when (%v= v)
+                        return (cl:list vf))
           else unless v?
                  collect f)))
 
 ;; versioned version of cffi:defcfnum
 (cl:defmacro defcenum/v (name-and-options cl:&body fields)
-  (cl:print `(cffi:defcenum ,name-and-options
-      ,@(cl:loop for f in fields
-           for v? = (cl:when (cl:typep f '(cl:cons cl:keyword (cl:cons cl:cons)))
-                      (cl:car f))
-           when v?
-             append (cl:loop for (v vf) on f by #'cl::cddr
-                       when (%v= v)
-                         return (cl:list vf))
-           else unless v?
-                  collect f))))
+  `(cffi:defcenum ,name-and-options
+     ,@(cl:loop for f in fields
+          for v? = (cl:when (cl:typep f '(cl:cons cl:keyword (cl:cons cl:cons)))
+                     (cl:car f))
+          when v?
+            append (cl:loop for (v vf) on f by #'cl::cddr
+                      when (%v= v)
+                        return (cl:list vf))
+          else unless v?
+                 collect f)))
+
+
+;; partial support for configurable float precision. Added in 4.0, but
+;; support in library is only detectable since 5.1.0, see
+;; ai-get-compile-flags, so will probably require at least that for
+;; now.
+(cffi:defctype ai-real :float)
+(cl:deftype real () 'cl:single-float)
+
 
 (defcstruct/v ai-string ;; 3.0+
   (:3.0-4.1 (length size-t)
@@ -117,16 +249,16 @@
   (data :char :count 1024))
 
 (cffi:defcstruct ai-vector-3d ;; 3.0+
-  (x :float)
-  (y :float)
-  (z :float))
+  (x ai-real)
+  (y ai-real)
+  (z ai-real))
 
 ;; 5.0+
 (cffi:defcstruct ai-aabb
   (m-min (:struct ai-vector-3d))
   (m-max (:struct ai-vector-3d)))
 
-(cffi:defcstruct ai-camera ;; 3.0+
+(defcstruct/v ai-camera ;; 3.0+
   (m-name (:struct ai-string))
   (m-position (:struct ai-vector-3d))
   (m-up (:struct ai-vector-3d))
@@ -134,7 +266,8 @@
   (m-horizontal-fov :float)
   (m-clip-plane-near :float)
   (m-clip-plane-far :float)
-  (m-aspect :float))
+  (m-aspect :float)
+  (:5.1+ (m-orthographic-width :float)))
 
 (cffi:defcenum (ai-origin :int) ;; 3.0+
   (:ai-origin-set 0)
@@ -142,9 +275,9 @@
   (:ai-origin-end 2))
 
 (cffi:defcstruct ai-color-3d ;; 3.0+
-  (r :float)
-  (g :float)
-  (b :float))
+  (r ai-real)
+  (g ai-real)
+  (b ai-real))
 
 (cffi:defcenum (ai-property-type-info :int)
   (:ai-pti-float 1)
@@ -159,8 +292,8 @@
   (sz-extension :string))
 
 (cffi:defcstruct ai-vector-2d ;; 3.0+
-  (x :float)
-  (y :float))
+  (x ai-real)
+  (y ai-real))
 
 (cffi:defcenum (ai-return :int) ;; 3.0+
   (:ai-return-success 0)
@@ -172,10 +305,10 @@
   (m-value (:struct ai-vector-3d)))
 
 (cffi:defcstruct ai-quaternion ;; 3.0+
-  (w :float)
-  (x :float)
-  (y :float)
-  (z :float))
+  (w ai-real)
+  (x ai-real)
+  (y ai-real)
+  (z ai-real))
 
 (cffi:defcstruct ai-quat-key ;; 3.0+
   (m-time :double)
@@ -231,15 +364,15 @@
 
 
 (cffi:defcstruct ai-matrix-3x-3 ;; 3.0+
-  (a-1 :float)
-  (a-2 :float)
-  (a-3 :float)
-  (b-1 :float)
-  (b-2 :float)
-  (b-3 :float)
-  (c-1 :float)
-  (c-2 :float)
-  (c-3 :float))
+  (a-1 ai-real)
+  (a-2 ai-real)
+  (a-3 ai-real)
+  (b-1 ai-real)
+  (b-2 ai-real)
+  (b-3 ai-real)
+  (c-1 ai-real)
+  (c-2 ai-real)
+  (c-3 ai-real))
 
 (cffi:defcfun ("aiCreateQuaternionFromMatrix" ai-create-quaternion-from-matrix) :void
   (quat (:pointer (:struct ai-quaternion)))
@@ -280,7 +413,10 @@
   (:5.0+ (:ai-texture-type-metalness 15))
   (:5.0+ (:ai-texture-type-diffuse-roughness 16))
   (:5.0+ (:ai-texture-type-ambient-occlusion 17))
-  (:5.0+ (:ai-texture-type-unknown 18)))
+  (:5.0+ (:ai-texture-type-unknown 18))
+  (:5.1+ (:ai-texture-sheen 19))
+  (:5.1+ (:ai-texture-clearcoar 20))
+  (:5.1+ (:ai-texture-transmission 21)))
 
 (cffi:defcstruct ai-material-property ;; 3.0+
   (m-key (:struct ai-string))
@@ -293,7 +429,7 @@
 (cffi:defcfun ("aiSetImportPropertyFloat" ai-set-import-property-float) :void
   (store :pointer) ;; added in 3.0
   (sz-name :string)
-  (value :float))
+  (value ai-real))
 
 (cffi:defcstruct ai-material ;; 3.0+
   (m-properties (:pointer (:pointer (:struct ai-material-property))))
@@ -309,31 +445,38 @@
   (p-prop-out (:pointer (:pointer (:struct ai-material-property)))))
 
 (cffi:defcstruct ai-matrix-4x-4 ;; 3.0+
-  (a-1 :float)
-  (a-2 :float)
-  (a-3 :float)
-  (a-4 :float)
-  (b-1 :float)
-  (b-2 :float)
-  (b-3 :float)
-  (b-4 :float)
-  (c-1 :float)
-  (c-2 :float)
-  (c-3 :float)
-  (c-4 :float)
-  (d-1 :float)
-  (d-2 :float)
-  (d-3 :float)
-  (d-4 :float))
+  (a-1 ai-real)
+  (a-2 ai-real)
+  (a-3 ai-real)
+  (a-4 ai-real)
+  (b-1 ai-real)
+  (b-2 ai-real)
+  (b-3 ai-real)
+  (b-4 ai-real)
+  (c-1 ai-real)
+  (c-2 ai-real)
+  (c-3 ai-real)
+  (c-4 ai-real)
+  (d-1 ai-real)
+  (d-2 ai-real)
+  (d-3 ai-real)
+  (d-4 ai-real))
 
-(cffi:defcenum (ai-metadata-type :int) ;; 3.1+
+(defcenum/v (ai-metadata-type :int) ;; 3.1+
+  ;; update translate-ai-metadata-entry if changing these, since it
+  ;; doesn't use the enum
   (:bool 0)
   (:int 1)
   (:uint64 2)
   (:float 3)
   (:double 4)
   (:ai-string 5)
-  (:ai-vector-3d 6))
+  (:ai-vector-3d 6)
+  ;; 5.1.0+
+  (:5.1+ (:ai-metadata 7))
+  ;; 5.2.6+?
+  (:5.2+ (:ai-int64 8))
+  (:5.2+ (:ai-uint32 9)))
 
 (cffi:defcstruct ai-metadata-entry ;; 3.1+
   (m-type ai-metadata-type)
@@ -352,25 +495,29 @@
   (m-children (:pointer (:pointer (:struct ai-node))))
   (m-num-meshes :unsigned-int)
   (m-meshes (:pointer :unsigned-int))
-  (:3.1+ (m-metadata (:pointer (:struct ai-metadata))))) ;; 3.1+
+  (:3.1+ (m-metadata (:pointer (:struct ai-metadata)))))
 
 (cffi:defcstruct ai-color-4d ;; 3.0+
-  (r :float)
-  (g :float)
-  (b :float)
-  (a :float))
+  (r ai-real)
+  (g ai-real)
+  (b ai-real)
+  (a ai-real))
 
 (cffi:defcstruct ai-face ;; 3.0+
   (m-num-indices :unsigned-int)
   (m-indices (:pointer :unsigned-int)))
 
-(cffi:defcstruct ai-vertex-weight ;; 3.0+
+(defcstruct/v ai-vertex-weight ;; 3.0+
   (m-vertex-id :unsigned-int)
-  (m-weight :float))
+  (:3.0-5.0 (m-weight :float)
+   :5.1+ (m-weight ai-real)))
 
-(cffi:defcstruct ai-bone ;; 3.0+
+(defcstruct/v ai-bone ;; 3.0+
   (m-name (:struct ai-string))
   (m-num-weights :unsigned-int)
+  ;; there is also a config option to disable these :/
+  (:5.1+ (m-armature (:pointer (:struct ai-node))))
+  (:5.1+ (m-node (:pointer (:struct ai-node))))
   (m-weights (:pointer (:struct ai-vertex-weight)))
   (m-offset-matrix (:struct ai-matrix-4x-4)))
 
@@ -378,6 +525,7 @@
 ;; though, so ignoring for now...
 ;; ... they changed anyway :/
 (cl:eval-when (:compile-toplevel :load-toplevel :execute) ;; 3.0+
+  ;; 4 in 3.0, 8 since 3.1
   (cl:defconstant +ai-max-number-of-color-sets+ 8)
   (cl:defconstant +ai-max-number-of-texturecoords+ 8))
 
@@ -396,11 +544,12 @@
   (m-weight :float))
 
 (cffi:defcenum (ai-morphing-method :int)
+  (:unknown 0) ;; 5.2.6?
   (:vertex-blend 1)
   (:morph-normalized 2)
   (:morph-relative 3))
 
-(cffi:defcstruct ai-mesh ;; 3.0+
+(defcstruct/v ai-mesh ;; 3.0+
   (m-primitive-types :unsigned-int)
   (m-num-vertices :unsigned-int)
   (m-num-faces :unsigned-int)
@@ -418,17 +567,36 @@
   (m-num-bones :unsigned-int)
   (m-bones (:pointer (:pointer (:struct ai-bone))))
   (m-material-index :unsigned-int)
-  (m-name (:struct ai-string)) ;; 3.0+
-  (m-num-anim-meshes :unsigned-int) ;; 3.0+, unused up to 3.3
-  (m-anim-meshes (:pointer (:pointer (:struct ai-anim-mesh)))) ;; 3.0+, unused up to 3.3
-  (m-method :unsigned-int) ;; >3.3
-  (m-aabb (:struct ai-aabb)))
+  (:3.0+ (m-name (:struct ai-string)))
+  (:3.0+ (m-num-anim-meshes :unsigned-int)) ;; unused up to 3.3
+  (:3.0+ (m-anim-meshes (:pointer (:pointer (:struct ai-anim-mesh))))) ;; unused up to 3.3
+  (:4.0+ (m-method :unsigned-int)) ;; changed to ai-morphing-method in 5.2.6+?
+  (:5.0+ (m-aabb (:struct ai-aabb)))
+  (:5.1+ (m-texture-coords-names (:pointer (:pointer (:struct ai-string))))))
+
+(cffi:defcstruct ai-skeleton-bone ;; 5.2.5+
+  (m-parent :int)
+  ;; next two have a config option to disable these :/
+  (m-armature (:pointer (:struct ai-node)))
+  (m-node (:pointer (:struct ai-node)))
+  (m-num-weights :unsigned-int)
+  (m-mesh-id (:pointer (:struct ai-mesh)))
+  (m-weights (:pointer (:struct ai-vertex-weight)))
+  (m-offset-matrix (:struct ai-matrix-4x-4))
+  (m-local-matrix (:struct ai-matrix-4x-4)))
+
+(cffi:defcstruct ai-skeleton ;; 5.2.5+
+  (m-name (:struct ai-string))
+  (m-num-bones :unsigned-int)
+  (m-bones (:pointer (:pointer (:struct ai-skeleton-bone)))))
 
 (cffi:defcstruct ai-texel ;; 3.0+
   (b :unsigned-char)
   (g :unsigned-char)
   (r :unsigned-char)
   (a :unsigned-char))
+
+(cl:defun foo () (nonexistant))
 
 (defcstruct/v ai-texture ;; 3.0+
   (m-width :unsigned-int)
@@ -437,7 +605,7 @@
   (:3.0-3.3 (ach-format-hint :char :count 4)
    :4.0+ (ach-format-hint :char :count 9))
   (pc-data (:pointer (:struct ai-texel)))
-  (:5.0+ (m-filename (:pointer (:struct ai-string)))))
+  (:5.0+ (m-filename (:struct ai-string))))
 
 (cffi:defcenum (ai-light-source-type :int) ;; 3.0+
   (:ai-light-source-undefined 0)
@@ -479,7 +647,10 @@
   (m-num-cameras :unsigned-int)
   (m-cameras (:pointer (:pointer (:struct ai-camera))))
   (:3.0-4.1 (m-private :pointer)
-   :5.0+ (m-metadata :pointer)))
+   :5.0+ (m-metadata :pointer))
+  (:5.1+ (m-name (:struct ai-string)))
+  (:>5.2 (m-num-skeletons :unsigned-int)) ;; 5.2.5+
+  (:>5.2 (m-skeletons (:pointer (:pointer (:struct ai-skeleton))))))
 
 #+nil
 (cffi:defbitfield ai-post-process-steps
@@ -527,6 +698,7 @@
   (:ai-process-improve-cache-locality #x800)
   (:ai-process-remove-redundant-materials #x1000)
   (:ai-process-fix-infacing-normals #x2000)
+  (:ai-process-populate-armature-data #x4000) ;; 5.1.0
   (:ai-process-sort-by-p-type #x8000)
   (:ai-process-find-degenerates #x10000)
   (:ai-process-find-invalid-data #x20000)
@@ -589,7 +761,7 @@
 (cffi:defcstruct ai-uv-transform ;; 3.0+
   (m-translation (:struct ai-vector-2d))
   (m-scaling (:struct ai-vector-2d))
-  (m-rotation :float))
+  (m-rotation ai-real))
 
 (cffi:defcstruct ai-memory-info ;; 3.0+
   (textures :unsigned-int)
@@ -606,8 +778,15 @@
   (p-key :string)
   (type :unsigned-int)
   (index :unsigned-int)
-  (p-out (:pointer :float))
+  (p-out (:pointer ai-real))
   (p-max (:pointer :unsigned-int)))
+
+(cffi:defcfun ("aiGetMaterialFloat" ai-get-material-float) ai-return ;; 5.1.0+
+  (p-mat (:pointer (:struct ai-material)))
+  (p-key :string)
+  (type :unsigned-int)
+  (index :unsigned-int)
+  (p-out (:pointer ai-real)))
 
 (cffi:defcfun ("aiGetVersionRevision" ai-get-version-revision) :unsigned-int)
 
@@ -641,7 +820,7 @@
   (p-streams ai-default-log-stream)
   (file :string))
 
-(cffi:defcenum (ai-shading-mode :int) ;; 3.0+
+(defcenum/v (ai-shading-mode :int) ;; 3.0+
   (:ai-shading-mode-flat 1)
   (:ai-shading-mode-gouraud 2)
   (:ai-shading-mode-phong 3)
@@ -651,7 +830,8 @@
   (:ai-shading-mode-minnaert 7)
   (:ai-shading-mode-cook-torrance 8)
   (:ai-shading-mode-no-shading 9)
-  (:ai-shading-mode-fresnel 10))
+  (:ai-shading-mode-fresnel 10)
+  (:5.1+ (:ai-shading-mode-pbr-brdf #xb)))
 
 ;; typedef size_t (*aiFileReadProc) (struct aiFile*, char*, size_t,size_t);
 (cffi::defctype ai-file-read-proc :pointer)
@@ -678,7 +858,7 @@
   ;; probably should get rid of long-name versions?
   (:normals 2)
   (:tangents-and-bitangents 4)
-  (:colors 8) ;; all color channels
+  (:colors 8)       ;; all color channels
   (:texcoords #x10) ;; all UV channels
   (:boneweights #x20)
   (:animations #x40)
@@ -742,7 +922,7 @@
   (path (:pointer (:struct ai-string)))
   (mapping (:pointer ai-texture-mapping))
   (uvindex (:pointer :unsigned-int))
-  (blend (:pointer :float))
+  (blend (:pointer ai-real))
   (op (:pointer ai-texture-op))
   (mapmode (:pointer ai-texture-map-mode))
   (flags (:pointer :unsigned-int)))
@@ -782,10 +962,10 @@
   (sz-out (:pointer (:struct ai-string))))
 
 (cffi:defcstruct ai-plane ;; 3.0+
-  (a :float)
-  (b :float)
-  (c :float)
-  (d :float))
+  (a ai-real)
+  (b ai-real)
+  (c ai-real)
+  (d ai-real))
 
 #-old-assimp
 (cffi:defcfun ("aiTransformVecByMatrix3" ai-transform-vec-by-matrix-3) :void
@@ -834,8 +1014,6 @@
   (type :unsigned-int)
   (index :unsigned-int)
   (p-out (:pointer (:struct ai-color-4d))))
-
-(cffi:defcfun ("aiGetCompileFlags" ai-get-compile-flags) :unsigned-int)
 
 (cffi:defcfun ("aiImportFileEx" ai-import-file-ex) (:pointer (:struct ai-scene))
   (p-file :string)
@@ -902,11 +1080,13 @@
   (:ai-primitive-type-line 2)
   (:ai-primitive-type-triangle 4)
   (:ai-primitive-type-polygon 8)
+  (:ai-primitive-type-ngon-encoding-flag #x10) ;; 5.1+
   ;; probably should get rid of long-name versions?
   (:point 1)
   (:line 2)
   (:triangle 4)
-  (:polygon 8))
+  (:polygon 8)
+  (:ngon-encoding #x10))
 
 #-old-assimp
 (cffi:defcfun ("aiApplyPostProcessing" ai-apply-post-processing)
@@ -988,8 +1168,23 @@
   (:rotate 2)
   (:translate 4))
 
+;;; various string constants
+(cl:defvar +default-material-name+ "DefaultMaterial")
+;;; metadata key (not sure these are/can be used anywhere yet though)
+(cl:defvar +metadata-source-format+ "SourceAsset_Format")
+(cl:defvar +metadata-source-format-version+ "SourceAsset_FormatVersion")
+(cl:defvar +metadata-source-generator+ "SourceAsset_Generator")
+(cl:defvar +metadata-source-copyright+ "SourceAsset_Copyright")
 
-
+(vcase
+  ((5 1 0)
+   (cffi:defcfun ("TextureTypeToString" ai-texture-type-to-string)
+       :string
+     (in ai-texture-type)))
+  ((5 2 4)
+   (cffi:defcfun ("aiTextureTypeToString" ai-texture-type-to-string)
+       :string
+     (in ai-texture-type))))
 ;; todo: export support
 ;; aiCopyScene
 ;; aiExportScene

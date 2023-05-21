@@ -51,6 +51,10 @@
        ;; tell fbx importer to read animations. default true
        (:import-fbx-read-animations . :bool)
 
+       ;; Set whether the fbx importer will read weights. default true
+       ;; (5.1+)
+       (:import-fbx-read-weights . :bool)
+
        ;; limit fbx importer to FBX 2013 format (best supported and
        ;; tested). default false
        (:import-fbx-strict-mode . :bool)
@@ -63,6 +67,22 @@
        ;; pose over whole range. default true
        (:import-fbx-optimize-empty-animation-curves . :bool)
 
+       ;; Set whether the fbx importer will use the legacy embedded
+       ;; texture naming. default false (5.0+)
+       ((:import-fbx-embedded-textures-legacy-naming) . :bool)
+
+       ;; Set whether the importer shall not remove empty bones.
+       ;; default true (5.0+)
+       ((:import-remove-empty-bones) . :bool)
+
+       ;; Set whether the FBX importer shall convert the unit from cm
+       ;; to m. default false (unused?) (5.0+)
+       #++((:import-config-fbx-convert-to-m) . :bool)
+
+       ;; Will enable the skeleton struct to store bone data. default
+       ;; false (5.2.5+)
+       ((:import-fbx-use-skeleton-bone-container) . :bool)
+
        ;; for formats with vertex anims and loaders that don't support
        ;; it, specify which keyframe to load. default 0
        (:import-global-keyframe . :int)
@@ -74,6 +94,44 @@
        (:import-mdl-keyframe . :int)
        (:import-smd-keyframe . :int)
        (:import-unreal-keyframe . :int)
+
+       ;; Set whether the MDL (HL1) importer will read
+       ;; animations. default true (5.1+)
+       (:import-mdl-hl1-read-animations . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read animation
+       ;; events when import-mdl-hl1-read-animations is true. default
+       ;; true (5.1+)
+       (:import-mdl-hl1-read-animation-events . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read blend
+       ;; controllers when import-mdl-hl1-read-animations is
+       ;; true. default true (5.1+)
+       (:import-mdl-hl1-read-blend-controllers . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read sequence
+       ;; transition graph when import-mdl-hl1-read-animations is
+       ;; true. default true (5.1+
+       (:import-mdl-hl1-read-sequence-transitions . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read attachments
+       ;; info. default true (5.1+)
+       (:import-mdl-hl1-read-attachments . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read bone
+       ;; controllers info. default true (5.1+)
+       (:import-mdl-hl1-read-bone-controllers . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read hitboxes
+       ;; info. default true (5.1+)
+       (:import-mdl-hl1-read-hitboxes . :bool)
+
+       ;; Set whether the MDL (HL1) importer will read miscellaneous
+       ;; global model info. default true (5.1+)
+       (:import-mdl-hl1-read-misc-global-info . :bool)
+
+       ;; load multiple animations. default true (5.0+)
+       (:import-smd-load-animation-list . :bool)
 
        ;; tell AC loader to move surfaces with "backface cull" flag to
        ;; separate meshes. default true
@@ -101,6 +159,11 @@
        ;; name combined with md3 filename to generate a skin name
        ;; ('default', 'red', 'blue', etc). default "default"
        (:import-md3-skin-name . :string)
+
+       ;; Specify if to try load Quake 3 shader files. This also
+       ;; controls original surface name handling: when disabled it
+       ;; will be used unchanged. default true (5.1+)
+       (:import-md3-load-shaders . :bool)
 
        ;; filename or path used for loading shader files for
        ;; md3 loader. default ""
@@ -133,7 +196,7 @@
        (:import-ogre-texturetype-from-filename . :bool)
 
        ;; default false
-       (:android-jni-assimp-manager-support . :bool)
+       ((:android-jni-assimp-manager-support) . :bool)
 
        ;; tell IFC loader to skip IfcSpace elements. default true
        (:import-ifc-skip-space-representations . :bool)
@@ -156,8 +219,26 @@
        ;; file. default false
        (:import-collada-ignore-up-direction . :bool)
 
+       ;; Specifies whether the Collada loader should use Collada
+       ;; names. default false (5.0+)
+       (:import-collada-use-collada-names . :bool)
+
        ;; tell X file exporter to use doubles instead of single floats
        (:export-xfile-64bit . :bool)
+
+       ;; Specifies whether the assimp export shall be able to export
+       ;; point clouds. default false (5.0+)
+       (:export-point-clouds . :bool)
+
+       ;; Specifies the blob name assimp uses for exporting. default
+       ;; "$blobfile" (5.1+)
+       (:export-blob-name . :string)
+
+       ;;  Specifies a global key factor for scale postprocess, float
+       ;;  value. default 1.0f (4.1+)
+       (:global-scale-factor . :float)
+       ;; ? default 1.0f (5.0+)
+       (:app-scale-factor . :float)
 
        ;; path to file containing colormap for textures in MDL files
        ;; default "colormap.lmp"
@@ -183,10 +264,19 @@
        ;; false
        (:pp-fd-remove . :bool)
 
+       ;; configure :ai-process-find-degenerates to remove triangles
+       ;; with area less than 1e-6 when :pp-fd-remove is true. (4.1+)
+       (:pp-fd-checkarea . :bool)
+
        ;; epsilon used for comparing key values when removing
        ;; animations with no changes in values in
        ;; :ai-process-find-invalid-data. default 0.0
        (:pp-fid-anim-accuracy . :float)
+
+       ;; Set to true to ignore texture coordinates in
+       ;; :ai-process-find-invalid-data. default false? (5.0+)
+       (:pp-fid-ignore-texcoords . :boolean)
+
 
        ;; smoothing angle in degrees for
        ;; :ai-process-gen-smooth-normals. default/max 175
@@ -248,9 +338,13 @@
        ;; :ai-process-transform-uv-coords. default (:scale :rotate
        ;; :transform) = all
        (:pp-tuv-evaluate . (:bitfield ai-uvtrafo)))
-     collect (list name type
-                   (string-upcase
-                    (substitute #\_ #\- (symbol-name name)))))))
+     for str1 = (string-upcase
+                 (substitute #\_ #\-
+                             (symbol-name (car (alexandria:ensure-list name)))))
+     for str = (if (consp name)
+                   (concatenate 'string "AI_CONFIG_" str)
+                   str1)
+     collect (list name type str))))
 
 (defmacro with-property-store ((store &key properties) &body body)
   (alexandria:with-gensyms (prop val)

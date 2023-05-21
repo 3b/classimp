@@ -358,5 +358,8 @@
            #:m-file-extensions
            #:ai-get-importer-description
            #:ai-get-material-uv-transform
-           #:ai-set-import-property-matrix))
+           #:ai-set-import-property-matrix
+           #:v>=
+           #:ai-real
+           #:real))
 
