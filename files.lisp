@@ -45,6 +45,7 @@
                (member (pathname-type f)
                        *extensions* :test 'equalp))))
     (when foo (setf *file-list* foo))
+    (format t "~&found ~s~%" (length foo))
     (format t "unknown extensions ~s~%" unknown)))
 
 (defun next-file-key (w &optional (delta 1))
