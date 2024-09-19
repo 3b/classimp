@@ -166,13 +166,19 @@
   ;; time stored in seconds if possible
   ((time :accessor key-time :initarg time) ;; double
    ;; array of 3 floats
-   (value :accessor value :initarg value)))
+   (value :accessor value :initarg value)
+   ;; :step, :linear, :spherical-linear, :cubic-spline
+   (interpolation :accessor interpolation :initarg interpolation
+                  :initform :linear)))
 
 (defclass quat-key ()
   ;; time stored in seconds if possible
   ((time :accessor key-time :initarg time) ;; double
    ;; array of 4 floats
-   (value :accessor value :initarg value)))
+   (value :accessor value :initarg value)
+   ;; :step, :linear, :spherical-linear, :cubic-spline
+   (interpolation :accessor interpolation :initarg interpolation
+                  :initform :linear)))
 
 (defclass mesh-key ()
   ;; time stored in seconds if possible
@@ -272,9 +278,9 @@
           ;; return (list :unsupported type) if so.
           (7 (progn ;; %ai:v>= (5 1 0)
                (translate-ai-metadata %ai:data)))
-          (8 (progn ;; %ai:v>= (5 2 6)
+          (8 (progn ;; %ai:v>= (5 3 0)
                (cffi:mem-ref %ai:data :int64)))
-          (9 (progn ;; %ai:v>= (5 2 6)
+          (9 (progn ;; %ai:v>= (5 3 0)
                (cffi:mem-ref %ai:data :uint32)))
           (t (list :unknown-metadata-type type)))))))
 
@@ -372,9 +378,19 @@
   (when (not (cffi:null-pointer-p v))
     (translate-vector v 4 %ai:ai-real %ai:real)))
 
+(defun translate-ai-color3f (c)
+  (when (not (cffi:null-pointer-p c))
+    (%ai::vcase
+      ((5 4 3) (translate-vector c 3 :float 'single-float))
+      ((4 0 0) (translate-vector c 3 %ai:ai-real %ai:real))
+      ((3 0 0) (translate-vector c 3 :float 'single-float)))))
+
 (defun translate-ai-color4f (c)
   (when (not (cffi:null-pointer-p c))
-    (translate-vector c 4 %ai:ai-real %ai:real)))
+    (%ai::vcase
+      ((5 4 3) (translate-vector c 4 :float 'single-float))
+      ((4 0 0) (translate-vector c 4 %ai:ai-real %ai:real))
+      ((3 0 0) (translate-vector c 4 :float 'single-float)))))
 
 (defun translate-uint (p)
   (cffi:mem-aref p :unsigned-int))
@@ -572,7 +588,8 @@
                              %ai:m-time
                              (/ %ai:m-time
                                 *translate-anim-node-ticks-per-second*))
-                   'value (translate-ai-vector3d %ai:m-value))))
+                   'value (translate-ai-vector3d %ai:m-value)
+                   'interpolation (%ai:v>= (5 4 3) %ai:m-interpolation))))
 
 (defun translate-ai-quaternion-key (k)
   (with-foreign-slots* ((%ai:m-time (:pointer %ai:m-value)) k
@@ -583,7 +600,8 @@
                              %ai:m-time
                              (/ %ai:m-time
                                 *translate-anim-node-ticks-per-second*))
-                   'value (translate-ai-vector4 %ai:m-value))))
+                   'value (translate-ai-vector4 %ai:m-value)
+                   'interpolation (%ai:v>= (5 4 3) %ai:m-interpolation))))
 
 (defun trannslate-mesh-key (k)
   (with-foreign-slots* ((%ai:m-time %ai:m-value) k
@@ -1000,10 +1018,52 @@
           :aspect %ai:m-aspect
           :orthographic-width (%ai:v>= (5 1 0) %ai::m-orthographic-width))))
 
+#++
+(defun translate-ai-skeleton-bone (sb)
+  (with-foreign-slots* ((%ai:m-parent
+                         %ai:m-armature
+                         %ai:m-node
+                         %ai:m-num-weights
+                         %ai:m-mesh-id
+                         %ai:m-weights
+                         (:pointer %ai:m-offset-matrix)
+                         (:pointer %ai:m-local-matrix))
+                        sb (:struct %ai:ai-skeleton-bone))
+    (list
+     :parent %ai:m-parent
+     :weights (translate-ai-array translate-ai-vertex-weight
+                                  %ai:m-num-weights %ai:m-weights)
+     :offset-matrix (translate-ai-matrix-4x4 %ai:m-offset-matrix)
+     :local-matrix (translate-ai-matrix-4x4 %ai:m-local-matrix)
+
+     ;; todo: we probably need to build a map of pointers to instances
+     ;; for these so we can have the same object in
+     ;; multiple places?
+     :armature (???-ai-node %ai:m-armature)
+     :node (???-ai-node %ai:m-node)
+     :mesh-id (???-ai-mesh %ai:m-mesh-id))))
+
+#++
+(defun translate-ai-skeleton (s)
+  (with-foreign-slots* (((:pointer %ai:m-name)
+                         %ai:m-num-bones
+                         %ai:m-bones)
+                        s (:struct %ai:ai-skeleton))
+    (when *translate-verbose*
+      (format t "translate skeleton ~s~%" (translate-ai-string %ai:m-name)))
+    (list (translate-ai-string %ai:m-name)
+          :bones (translate-ai-array translate-ai-skeleton-bone
+                                     %ai:m-num-bones %ai:m-bones))))
+
 (defun check-version ()
   (let* ((major (%ai:ai-get-version-major))
          (minor (%ai:ai-get-version-minor))
-         (version (intern (format () "~a.~a" major minor) :keyword)))
+         (v5.3 (or (> major 5) (and (= major 5) (>= minor 3))))
+         (patch (if v5.3 (%ai::ai-get-version-patch) 0))
+         (version (intern (if v5.3
+                              (format nil "~a.~a.~a" major minor patch)
+                              (format nil "~a.~a" major minor))
+                          :keyword)))
     (unless (eql version %ai::*version*)
       (cerror "try using it anyway"
               "classimp was compiled for assimp version ~a, current assimp version is ~a" %ai::*version* version))))
@@ -1018,10 +1078,10 @@
                          %ai:m-num-textures %ai:m-textures
                          %ai:m-num-lights %ai:m-lights
                          %ai:m-num-cameras %ai:m-cameras
-                         %ai::m-metadata
+                         %ai:m-metadata
                          (:pointer %ai:m-name)
                          ;; not in bindings yet
-                         ;; %ai::m-num-skeletons %ai::m-skeletons
+                         %ai:m-num-skeletons %ai:m-skeletons
                          )
                         scene (:struct %ai:ai-scene))
     (make-instance
@@ -1041,7 +1101,11 @@
      'cameras (translate-ai-array translate-ai-camera
                                   %ai:m-num-cameras %ai:m-cameras)
      'metadata (%ai:v>= (5 0 0) (translate-ai-metadata %ai::m-metadata))
-     'name (%ai:v>= (5 1 0) (translate-ai-string %ai::m-name)))))
+     'name (%ai:v>= (5 1 0) (translate-ai-string %ai::m-name))
+     #++ #++
+     'skeletons (%ai:v>= (5 3 0)
+                  (translate-ai-array translate-ai-skeleton
+                                      %ai:m-num-skeletons %ai:m-skeletons)))))
 
 (defun translate-ai-importer-desc (desc)
   (%ai:v>= (3 2 0)
