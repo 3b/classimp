@@ -89,8 +89,8 @@
   (gl:enable enum)
   (destructuring-bind (type &key name direction position
                             diffuse specular ambient
-                            inner-angle outer-angle) light
-    (declare (ignore name inner-angle))
+                            inner-angle outer-angle up) light
+    (declare (ignore name inner-angle up))
     (gl:light enum :ambient (v3->v4 ambient 1.0))
     (gl:light enum :diffuse (v3->v4 diffuse 1.0))
     (gl:light enum :specular (v3->v4 specular 1.0))
@@ -256,7 +256,7 @@
                 :ai-process-find-instances
                 :ai-process-remove-redundant-materials
                 :ai-process-flip-winding-order
-                :ai-process-flip-u-vs
+                ;:ai-process-flip-u-vs
                 :ai-process-make-left-handed
                 :ai-process-validate-data-structure
                 :ai-process-gen-bounding-boxes
