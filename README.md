@@ -1,13 +1,14 @@
 classimp
 ========
 
-common lisp/cffi bindings for Open Asset Import Library (http://assimp.sourceforge.net/)
+common lisp/cffi bindings for Open Asset Import Library (https://www.assimp.org/)
 
-Should support assimp versions 3.0 to 3.3.x. Version to support is
+Should support assimp versions 3.0 to 5.4.3. Version to support is
 determined by querying c library at compile time (or load if not
 previously compiled), with errors if versions don't match at load or
-runtime. (Current assimp from git will be detected as 3.3, but isn't
-completely binary compatible so might have problems)
+runtime. (Current assimp from git will probably be detected as last
+released version, but might not be completely binary compatible so
+might have problems)
 
 
 Allows (among other things) loading of the following formats:
