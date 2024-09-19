@@ -361,5 +361,15 @@
            #:ai-set-import-property-matrix
            #:v>=
            #:ai-real
-           #:real))
+           #:real
+           #:m-interpolation
+           #:m-num-skeletons
+           #:m-skeletons
+           #:ai-skeleton
+           #:ai-skeleton-bone
+           #:m-metadata
+           #:m-armature
+           #:m-node
+           #:m-mesh-id
+           #:m-local-matrix))
 

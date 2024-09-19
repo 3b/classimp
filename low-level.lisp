@@ -52,32 +52,55 @@
     (cl:let* ((major (cl:ignore-errors (ai-get-version-major)))
               (minor (cl:ignore-errors (ai-get-version-minor)))
               (patch (cl:when (cl:or (cl:> major 5)
-                                     (cl:and (cl:>= major 5) (cl:>= minor 1)))
+                                     (cl:and (cl:= major 5) (cl:>= minor 1)))
                        (cl:ignore-errors (ai-get-version-patch))))
-              ;; not including patch in keyword since current use
-              ;; assumes :x.y. Need to rewrite tests to account for
-              ;; patch, since there are ABI/API changes at patch
-              ;; level.
+              ;; there are ABI/API changes at patch level, so
+              ;; including patch level starting with 5.3.0
               (new-version (cl:intern
-                            (cl:format () "~a.~a" major minor) :keyword)))
+                            (cl:if (cl:or (cl:> major 5)
+                                          (cl:and (cl:= major 5)
+                                                  (cl:>= minor 3)))
+                                   (cl:format () "~a.~a.~a" major minor patch)
+                                   (cl:format () "~a.~a" major minor))
+                            :keyword)))
       (cl:values new-version major minor patch)))
 
   (cl:defun %v= (req)
-    (cl:ecase req
-      (:3.0-3.3 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3))) ;; exact versions
-      (:3.0-4.1 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1))) ;; exact versions
-      (:3.0-5.0 (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1 :5.0))) ;; exact versions
-      (:3.0+ (cl:member *version* '(:3.0 :3.1 :3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
-      (:3.1+ (cl:member *version* '(:3.1 :3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
-      (:3.2+ (cl:member *version* '(:3.2 :3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
-      (:3.3+ (cl:member *version* '(:3.3 :4.0 :4.1 :5.0 :5.1 :5.2)))
-      (:>3.3 (cl:error "fix this"))
-      (:4.0+ (cl:member *version* '(:4.0 :4.1 :5.0 :5.1 :5.2)))
-      (:4.1+ (cl:member *version* '(:4.1 :5.0 :5.1 :5.2)))
-      (:5.0+ (cl:member *version* '(:5.0 :5.1 :5.2)))
-      (:5.1+ (cl:member *version* '(:5.1 :5.2)))
-      (:5.2+ (cl:member *version* '(:5.2)))
-      (:>5.2 ()))))
+    (cl:macrolet ((vrange (a cl:&optional b)
+                    `',(cl:loop with keep = ()
+                          for i in '(:3.0 :3.1 :3.2 :3.3
+                                     :4.0 :4.1
+                                     :5.0 :5.1 :5.2
+                                     ;; including patch level starting at 5.3
+                                     :5.3.0 :5.3.1
+                                     :5.4.0 :5.4.1 :5.4.2 :5.4.3)
+                          when (cl:eql i a)
+                            do (cl:setf keep cl:t)
+                          when keep
+                            collect i
+                          until (cl:eql i b))))
+      (cl:ecase req
+        ;; exact versions
+        (:3.0-3.3 (cl:member *version* (vrange :3.0 :3.3)))
+        (:3.0-4.1 (cl:member *version* (vrange :3.0 :4.1)))
+        (:3.0-5.0 (cl:member *version* (vrange :3.0 :5.0)))
+        (:4.0-5.4.2 (cl:member *version* (vrange :4.0 :5.4.2)))
+        ;; ranges
+        (:3.0+ (cl:member *version* (vrange :3.0)))
+        (:3.1+ (cl:member *version* (vrange :3.1)))
+        (:3.2+ (cl:member *version* (vrange :3.2)))
+        (:3.3+ (cl:member *version* (vrange :3.3)))
+        (:>3.3 (cl:error "fix this"))
+        (:4.0+ (cl:member *version* (vrange :4.0)))
+        (:4.1+ (cl:member *version* (vrange :4.1)))
+        (:5.0+ (cl:member *version* (vrange :5.0)))
+        (:5.1+ (cl:member *version* (vrange :5.1)))
+        (:5.2+ (cl:member *version* (vrange :5.2)))
+        (:>5.2 (cl:error "fix this"))
+        (:5.3.0+ (cl:member *version* (vrange :5.3.0)))
+        (:5.4.0+ (cl:member *version* (vrange :5.4.0)))
+        (:5.4.3+ (cl:member *version* (vrange :5.4.3)))
+        (:>5.4 ())))))
 
 (cl:eval-when (:compile-toplevel)
   (cl:setf %compiled% cl:t)
@@ -89,9 +112,11 @@
         (cl:unless (cl:case major
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
-                     (5 (cl:<= minor 2))
+                     (5 (cl:or (cl:<= 0 minor 3)
+                               (cl:and (cl:= minor 4)
+                                       (cl:<= 0 patch 3))))
                      (cl:t ()))
-          (cl:error "trying to link against unsupported version of assimp. 3.0-5.2.x supported, got version ~a.~a~@[.~a~]"
+          (cl:error "trying to link against unsupported version of assimp. 3.0-5.4.3 supported, got version ~a.~a~@[.~a~]"
                     major minor patch))
         (cl:setf %version% new-version)
         (cl:setf %cflags% (cl:when (cl:or (cl:> major 5)
@@ -119,9 +144,11 @@
         (cl:unless (cl:case major
                      (3 (cl:<= 0 minor 3))
                      (4 (cl:<= 0 minor 1))
-                     (5 (cl:<= minor 2))
+                     (5 (cl:or (cl:<= 0 minor 3)
+                               (cl:and (cl:= minor 4)
+                                       (cl:<= 0 patch 3))))
                      (cl:t ()))
-          (cl:error "trying to link against unsupported version of assimp. 3.0-5.0.x supported, got version ~a.~a"
+          (cl:error "trying to link against unsupported version of assimp. 3.0-5.4.3 supported, got version ~a.~a"
                     major minor))
         (cl:let ((cflags (cl:when (%v= :5.1+)
                            (ai-get-compile-flags))))
@@ -229,6 +256,19 @@ clause at compile time will be used."
           else unless v?
                  collect f)))
 
+;; versioned version of cffi:defcfun
+(cl:defmacro defcfun/v (name-and-options ret cl:&body args)
+  `(cffi:defcfun ,name-and-options ,ret
+     ,@(cl:loop for f in args
+          for v? = (cl:when (cl:typep f '(cl:cons cl:keyword (cl:cons cl:cons)))
+                     (cl:car f))
+          when v?
+            append (cl:loop for (v vf) on f by #'cl::cddr
+                      when (%v= v)
+                        return (cl:list vf))
+          else unless v?
+                 collect f)))
+
 
 ;; partial support for configurable float precision. Added in 4.0, but
 ;; support in library is only detectable since 5.1.0, see
@@ -237,16 +277,17 @@ clause at compile time will be used."
 (cffi:defctype ai-real :float)
 (cl:deftype real () 'cl:single-float)
 
+(cl:defconstant +ai-maxlen+ 1024)
 
 (defcstruct/v ai-string ;; 3.0+
   (:3.0-4.1 (length size-t)
    :5.0+ (length :uint32))
-  (data :char :count 1024))
+  (data :char :count #.+ai-maxlen+))
 
 ;; 3.0+, used in material string properties (same as ai-string in 5+
 (cffi:defcstruct ai-string32
   (length :uint32)
-  (data :char :count 1024))
+  (data :char :count #.+ai-maxlen+))
 
 (cffi:defcstruct ai-vector-3d ;; 3.0+
   (x ai-real)
@@ -274,10 +315,14 @@ clause at compile time will be used."
   (:ai-origin-cur 1)
   (:ai-origin-end 2))
 
-(cffi:defcstruct ai-color-3d ;; 3.0+
-  (r ai-real)
-  (g ai-real)
-  (b ai-real))
+(defcstruct/v ai-color-3d ;; 3.0+
+  ;; float before 4.0, then ai-real through 5.4.2, then float again from 5.4.3
+  (:4.0-5.4.2 (r ai-real)
+   :3.0+ (r :float))
+  (:4.0-5.4.2 (g ai-real)
+   :3.0+ (g :float))
+  (:4.0-5.4.2 (b ai-real)
+   :3.0+ (b :float)))
 
 (cffi:defcenum (ai-property-type-info :int)
   (:ai-pti-float 1)
@@ -300,9 +345,16 @@ clause at compile time will be used."
   (:ai-return-failure -1)
   (:ai-return-outofmemory -3))
 
-(cffi:defcstruct ai-vector-key ;; 3.0+
+(cffi:defcenum (ai-anim-interpolation :int);;5.4.3+
+  :step
+  :linear
+  :spherical-linear
+  :cubic-spline)
+
+(defcstruct/v ai-vector-key ;; 3.0+
   (m-time :double)
-  (m-value (:struct ai-vector-3d)))
+  (m-value (:struct ai-vector-3d))
+  (:5.4.3+ (m-interpolation ai-anim-interpolation))) ;; default :linear?
 
 (cffi:defcstruct ai-quaternion ;; 3.0+
   (w ai-real)
@@ -310,9 +362,10 @@ clause at compile time will be used."
   (y ai-real)
   (z ai-real))
 
-(cffi:defcstruct ai-quat-key ;; 3.0+
+(defcstruct/v ai-quat-key ;; 3.0+
   (m-time :double)
-  (m-value (:struct ai-quaternion)))
+  (m-value (:struct ai-quaternion))
+  (:5.4.3+ (m-interpolation ai-anim-interpolation))) ;; default :linear?
 
 (cffi:defcstruct ai-mesh-key ;; 3.1+
   (m-time :double)
@@ -414,9 +467,13 @@ clause at compile time will be used."
   (:5.0+ (:ai-texture-type-diffuse-roughness 16))
   (:5.0+ (:ai-texture-type-ambient-occlusion 17))
   (:5.0+ (:ai-texture-type-unknown 18))
-  (:5.1+ (:ai-texture-sheen 19))
-  (:5.1+ (:ai-texture-clearcoar 20))
-  (:5.1+ (:ai-texture-transmission 21)))
+  (:5.1+ (:ai-texture-type-sheen 19))
+  (:5.1+ (:ai-texture-type-clearcoat 20))
+  (:5.1+ (:ai-texture-type-transmission 21))
+  (:5.4.3+ (:ai-texture-type-maya-base 22))
+  (:5.4.3+ (:ai-texture-type-maya-specular 23))
+  (:5.4.3+ (:ai-texture-type-maya-specular-color 24))
+  (:5.4.3+ (:ai-texture-type-maya-specular-roughness 25)))
 
 (cffi:defcstruct ai-material-property ;; 3.0+
   (m-key (:struct ai-string))
@@ -474,9 +531,9 @@ clause at compile time will be used."
   (:ai-vector-3d 6)
   ;; 5.1.0+
   (:5.1+ (:ai-metadata 7))
-  ;; 5.2.6+?
-  (:5.2+ (:ai-int64 8))
-  (:5.2+ (:ai-uint32 9)))
+  ;; 5.3.0+
+  (:5.3.0+ (:ai-int64 8))
+  (:5.3.0+ (:ai-uint32 9)))
 
 (cffi:defcstruct ai-metadata-entry ;; 3.1+
   (m-type ai-metadata-type)
@@ -497,11 +554,15 @@ clause at compile time will be used."
   (m-meshes (:pointer :unsigned-int))
   (:3.1+ (m-metadata (:pointer (:struct ai-metadata)))))
 
-(cffi:defcstruct ai-color-4d ;; 3.0+
-  (r ai-real)
-  (g ai-real)
-  (b ai-real)
-  (a ai-real))
+(defcstruct/v ai-color-4d ;; 3.0+
+  (:4.0-5.4.2 (r ai-real)
+   :3.0+ (r :float))
+  (:4.0-5.4.2 (g ai-real)
+   :3.0+ (g :float))
+  (:4.0-5.4.2 (b ai-real)
+   :3.0+ (b :float))
+  (:4.0-5.4.2 (a ai-real)
+   :3.0+ (a :float)))
 
 (cffi:defcstruct ai-face ;; 3.0+
   (m-num-indices :unsigned-int)
@@ -544,7 +605,7 @@ clause at compile time will be used."
   (m-weight :float))
 
 (cffi:defcenum (ai-morphing-method :int)
-  (:unknown 0) ;; 5.2.6?
+  (:unknown 0) ;; 5.3.0+
   (:vertex-blend 1)
   (:morph-normalized 2)
   (:morph-relative 3))
@@ -570,7 +631,9 @@ clause at compile time will be used."
   (:3.0+ (m-name (:struct ai-string)))
   (:3.0+ (m-num-anim-meshes :unsigned-int)) ;; unused up to 3.3
   (:3.0+ (m-anim-meshes (:pointer (:pointer (:struct ai-anim-mesh))))) ;; unused up to 3.3
-  (:4.0+ (m-method :unsigned-int)) ;; changed to ai-morphing-method in 5.2.6+?
+  ;; m-method changed to ai-morphing-method in 5.3.0, but we translate
+  ;; it in the wrappers anyway, so leaving it as :unsigned-int here
+  (:4.0+ (m-method :unsigned-int))
   (:5.0+ (m-aabb (:struct ai-aabb)))
   (:5.1+ (m-texture-coords-names (:pointer (:pointer (:struct ai-string))))))
 
@@ -649,8 +712,8 @@ clause at compile time will be used."
   (:3.0-4.1 (m-private :pointer)
    :5.0+ (m-metadata :pointer))
   (:5.1+ (m-name (:struct ai-string)))
-  (:>5.2 (m-num-skeletons :unsigned-int)) ;; 5.2.5+
-  (:>5.2 (m-skeletons (:pointer (:pointer (:struct ai-skeleton))))))
+  (:5.3+ (m-num-skeletons :unsigned-int)) ;; 5.2.5+
+  (:5.3+ (m-skeletons (:pointer (:pointer (:struct ai-skeleton))))))
 
 #+nil
 (cffi:defbitfield ai-post-process-steps
@@ -773,20 +836,28 @@ clause at compile time will be used."
   (lights :unsigned-int)
   (total :unsigned-int))
 
-(cffi:defcfun ("aiGetMaterialFloatArray" ai-get-material-float-array) ai-return
+;; commenting out these 2 for now, since having different pointer
+;; types for the args depending on versions is confusing and error-prone.
+;; not sure if it should have different names per ABI or just make sure to
+;; include a wrapper that uses it correctly depending on version?
+#++
+(defcfun/v ("aiGetMaterialFloatArray" ai-get-material-float-array) ai-return
   (p-mat (:pointer (:struct ai-material)))
   (p-key :string)
   (type :unsigned-int)
   (index :unsigned-int)
-  (p-out (:pointer ai-real))
+  (:4.0-5.4.2 (p-out (:pointer ai-real))
+   :3.0+ (p-out (:pointer :float)))
   (p-max (:pointer :unsigned-int)))
 
-(cffi:defcfun ("aiGetMaterialFloat" ai-get-material-float) ai-return ;; 5.1.0+
+#++
+(defcfun/v ("aiGetMaterialFloat" ai-get-material-float) ai-return ;; 5.1.0+
   (p-mat (:pointer (:struct ai-material)))
   (p-key :string)
   (type :unsigned-int)
   (index :unsigned-int)
-  (p-out (:pointer ai-real)))
+  (:4.0-5.4.2 (p-out (:pointer ai-real))
+   :3.0+ (p-out (:pointer :float))))
 
 (cffi:defcfun ("aiGetVersionRevision" ai-get-version-revision) :unsigned-int)
 
@@ -839,6 +910,11 @@ clause at compile time will be used."
 (cffi:defcfun ("aiGetMemoryRequirements" ai-get-memory-requirements) :void
   (p-in (:pointer (:struct ai-scene)))
   (in (:pointer (:struct ai-memory-info))))
+
+(cffi:defcfun ("aiGetEmbeddedTexture" ai-get-embedded-texture)
+    (:pointer (:struct ai-texture))
+  (p-in (:pointer (:struct ai-scene)))
+  (filename :string))
 
 ;; typedef size_t (*aiFileTellProc) (C_STRUCT aiFile*);
 (cffi::defctype ai-file-tell-proc :pointer)
