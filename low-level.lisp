@@ -659,8 +659,6 @@ clause at compile time will be used."
   (r :unsigned-char)
   (a :unsigned-char))
 
-(cl:defun foo () (nonexistant))
-
 (defcstruct/v ai-texture ;; 3.0+
   (m-width :unsigned-int)
   (m-height :unsigned-int)
