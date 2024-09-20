@@ -712,8 +712,8 @@ clause at compile time will be used."
   (:3.0-4.1 (m-private :pointer)
    :5.0+ (m-metadata :pointer))
   (:5.1+ (m-name (:struct ai-string)))
-  (:5.3+ (m-num-skeletons :unsigned-int)) ;; 5.2.5+
-  (:5.3+ (m-skeletons (:pointer (:pointer (:struct ai-skeleton))))))
+  (:5.3.0+ (m-num-skeletons :unsigned-int)) ;; 5.2.5+
+  (:5.3.0+ (m-skeletons (:pointer (:pointer (:struct ai-skeleton))))))
 
 #+nil
 (cffi:defbitfield ai-post-process-steps
