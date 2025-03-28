@@ -802,7 +802,7 @@
                  ;; work around bug in ai gltf importer
                  ;; https://github.com/assimp/assimp/issues/2997
                  (when (and (member *wrapper-version*
-                                    '(:|5.0| :|5.1| :|5.2|))
+                                    '(:|5.0| :|5.1| :|5.2| :|5.3| :|5.3.1|))
                             (= %ai:m-data-length 1)
                             (eql type :uint)
                             (eql %ai:m-type :ai-pti-buffer))
