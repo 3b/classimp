@@ -74,7 +74,7 @@
                                      ;; including patch level starting at 5.3
                                      :5.3.0 :5.3.1
                                      :5.4.0 :5.4.1 :5.4.2 :5.4.3
-                                     :6.0.0 :6.0.1 :6.0.2)
+                                     :6.0.0 :6.0.1 :6.0.2 :6.0.3 :6.0.4)
                           when (cl:eql i a)
                             do (cl:setf keep cl:t)
                           when keep
@@ -119,9 +119,9 @@
                                (cl:and (cl:= minor 4)
                                        (cl:<= 0 patch 3))))
                      (6 (cl:or (cl:and (cl:= minor 0)
-                                       (cl:<= 0 patch 2))))
+                                       (cl:<= 0 patch 4))))
                      (cl:t ()))
-          (cl:error "trying to link against unsupported version of assimp. 3.0-6.0.2 supported, got version ~a.~a~@[.~a~]"
+          (cl:error "trying to link against unsupported version of assimp. 3.0-6.0.4 supported, got version ~a.~a~@[.~a~]"
                     major minor patch))
         (cl:setf %version% new-version)
         (cl:setf %cflags% (cl:when (cl:or (cl:> major 5)
@@ -153,9 +153,9 @@
                                (cl:and (cl:= minor 4)
                                        (cl:<= 0 patch 3))))
                      (6 (cl:or (cl:and (cl:= minor 0)
-                                       (cl:<= 0 patch 2))))
+                                       (cl:<= 0 patch 4))))
                      (cl:t ()))
-          (cl:error "trying to link against unsupported version of assimp. 3.0-6.0.2 supported, got version ~a.~a"
+          (cl:error "trying to link against unsupported version of assimp. 3.0-6.0.4 supported, got version ~a.~a"
                     major minor))
         (cl:let ((cflags (cl:when (%v= :5.1+)
                            (ai-get-compile-flags))))
