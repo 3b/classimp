@@ -809,7 +809,7 @@
                  ;; https://github.com/assimp/assimp/issues/2997
                  (when (and (member *wrapper-version*
                                     '(:|5.0| :|5.1| :|5.2| :|5.3| :|5.3.1|
-                                      :|6.0.0| :|6.0.1| :|6.0.2|))
+                                      :|6.0.0| :|6.0.1| :|6.0.2| :|6.0.3| :|6.0.4|))
                             (= %ai:m-data-length 1)
                             (eql type :uint)
                             (eql %ai:m-type :ai-pti-buffer))
