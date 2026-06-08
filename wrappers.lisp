@@ -1153,7 +1153,8 @@
 (defun import-into-lisp (filename &key processing-flags raw-times properties)
   ;; see config.lisp for PROPERTIES values/usage
   (check-version)
-  (let ((raw-scene nil) (*loader-translate-times* (not raw-times)))
+  (let ((raw-scene nil) (*loader-translate-times* (not raw-times))
+        (filename (uiop:native-namestring (truename filename))))
     (prog1
         (unwind-protect
              (let ((flags (cffi:foreign-bitfield-value
@@ -1165,9 +1166,9 @@
                        (if properties
                            (with-property-store (store :properties properties)
                              (%ai:ai-import-file-ex-with-properties
-                              (namestring filename) flags
+                              filename flags
                               (cffi:null-pointer) store))
-                           (%ai:ai-import-file (namestring filename) flags))))
+                           (%ai:ai-import-file filename flags))))
                (when (and (cffi:null-pointer-p raw-scene)
                           *translate-verbose*)
                  (format t "  import failed: ~s~%" (%ai:ai-get-error-string)))
