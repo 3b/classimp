@@ -381,16 +381,16 @@
 (defun translate-ai-color3f (c)
   (when (not (cffi:null-pointer-p c))
     (%ai::vcase
-      ((5 4 3) (translate-vector c 3 :float 'single-float))
+      ((5 4 3) (translate-vector c 3 :float single-float))
       ((4 0 0) (translate-vector c 3 %ai:ai-real %ai:real))
-      ((3 0 0) (translate-vector c 3 :float 'single-float)))))
+      ((3 0 0) (translate-vector c 3 :float single-float)))))
 
 (defun translate-ai-color4f (c)
   (when (not (cffi:null-pointer-p c))
     (%ai::vcase
-      ((5 4 3) (translate-vector c 4 :float 'single-float))
+      ((5 4 3) (translate-vector c 4 :float single-float))
       ((4 0 0) (translate-vector c 4 %ai:ai-real %ai:real))
-      ((3 0 0) (translate-vector c 4 :float 'single-float)))))
+      ((3 0 0) (translate-vector c 4 :float single-float)))))
 
 (defun translate-uint (p)
   (cffi:mem-aref p :unsigned-int))
