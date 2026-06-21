@@ -12,4 +12,4 @@
                (:file "utils")
                (:file "config")
                (:file "wrappers"))
-  :depends-on (:cffi :split-sequence))
+  :depends-on (:cffi :split-sequence :uiop))
